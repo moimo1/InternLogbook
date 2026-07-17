@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Success</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl border w-full max-w-md text-center">
+
+        <!-- DYNAMIC STATUS ICON / IMAGE -->
+        {% if is_late %}
+            <!-- LATE SCENARIO: Show the custom supervisor reprimand image -->
+            <div class="mb-6 mx-auto w-48 h-48 rounded-xl overflow-hidden border-4 border-red-500 shadow-md">
+                <img src="../static/reprimand.png" alt="Late Reprimand" class="w-full h-full object-cover">
+            </div>
+            <h2 class="text-3xl font-extrabold text-red-600 mb-2">YOU ARE LATE!</h2>
+        {% else %}
+            <!-- NORMAL SCENARIO: Standard clock in/out icons -->
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full {% if log_type == 'IN' %}bg-green-100 text-green-600{% else %}bg-amber-100 text-amber-600{% endif %} mb-6">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <h2 class="text-3xl font-extrabold text-gray-900 mb-2">Action Confirmed!</h2>
+        {% endif %}
+
+        <p class="text-gray-600 text-lg mb-6">Hello, <span class="font-bold text-gray-800">{{ username }}</span></p>
+
+        <div class="bg-gray-50 rounded-xl p-4 mb-4 border">
+            <span class="text-sm font-semibold text-gray-500 tracking-wider uppercase block mb-1">Status Logged</span>
+            <span class="text-2xl font-black {% if log_type == 'IN' and not is_late %}text-green-600{% elif is_late %}text-red-600{% else %}text-amber-600{% endif %}">
+                CLOCKED {{ log_type }} {% if is_late %}(LATE){% endif %}
+            </span>
+            <span class="block text-gray-500 text-sm mt-2 font-medium">{{ time }}</span>
+        </div>
+
+        <!-- INTEGRATED TOTAL CREDITED HOURS METRIC BLOCK -->
+        <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
+            <span class="text-xs text-gray-500 uppercase font-bold tracking-wider block">Your Total Credited Hours</span>
+            <span class="text-3xl font-black text-blue-700 mt-1 block">{{ total_hours }} hrs</span>
+        </div>
+
+        <p class="text-xs text-gray-400">You may close this browser tab safely.</p>
+    </div>
+</body>
+</html>
