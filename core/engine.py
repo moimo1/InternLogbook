@@ -31,7 +31,7 @@ def get_schedule_for_date(dt_obj):
     return default_rules
 
 
-def calculate_intern_hours(user_id, log_date_str):
+def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=None):
     """
     Calculates raw, credited, and overtime hours for a specific intern.
     Cradles a minimum 30-minute requirement for overtime approval eligibility.
@@ -41,27 +41,34 @@ def calculate_intern_hours(user_id, log_date_str):
 
     target_date = datetime.strptime(log_date_str, '%Y-%m-%d').date()
 
-    with get_db_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            # Fetch shift logs matching this distinct date
-            cursor.execute('''
-                           SELECT log_type, timestamp
-                           FROM logs
-                           WHERE user_id = %s
-                             AND timestamp :: date = %s
-                           ORDER BY timestamp ASC
-                           ''', (user_id, target_date))
-            logs = cursor.fetchall()
+    if daily_logs is None or ot_approved is None:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                if daily_logs is None:
+                    # Fetch shift logs matching this distinct date
+                    cursor.execute('''
+                                   SELECT log_type, timestamp
+                                   FROM logs
+                                   WHERE user_id = %s
+                                     AND timestamp :: date = %s
+                                   ORDER BY timestamp ASC
+                                   ''', (user_id, target_date))
+                    logs = cursor.fetchall()
+                else:
+                    logs = daily_logs
 
-            # Check if an admin approved overtime for this specific date
-            cursor.execute('''
-                           SELECT hours_approved
-                           FROM approved_overtime
-                           WHERE user_id = %s
-                             AND overtime_date = %s
-                           ''', (user_id, target_date))
-            ot_row = cursor.fetchone()
-            ot_approved = float(ot_row['hours_approved']) if ot_row else 0.0
+                if ot_approved is None:
+                    # Check if an admin approved overtime for this specific date
+                    cursor.execute('''
+                                   SELECT hours_approved
+                                   FROM approved_overtime
+                                   WHERE user_id = %s
+                                     AND overtime_date = %s
+                                   ''', (user_id, target_date))
+                    ot_row = cursor.fetchone()
+                    ot_approved = float(ot_row['hours_approved']) if ot_row else 0.0
+    else:
+        logs = daily_logs
 
     raw_hours = 0.0
     credited_hours = 0.0

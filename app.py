@@ -225,6 +225,26 @@ def admin_dashboard():
             excused_list = cursor.fetchall()
             excused_map = {(e['user_id'], str(e['absence_date'])): True for e in excused_list}
 
+            # Pre-fetch approved overtime to avoid N+1 database connection overhead
+            cursor.execute('SELECT user_id, overtime_date, hours_approved FROM approved_overtime')
+            ot_list = cursor.fetchall()
+            ot_map = {(o['user_id'], str(o['overtime_date'])): float(o['hours_approved']) for o in ot_list}
+
+    # Group logs by user and date in memory to pass to calculate_intern_hours
+    logs_by_user_and_date = {}
+    for log in raw_logs:
+        uid = log['user_id']
+        date_str = str(log['log_date'])
+        key = (uid, date_str)
+        if key not in logs_by_user_and_date:
+            logs_by_user_and_date[key] = []
+        logs_by_user_and_date[key].append({
+            'log_type': log['log_type'],
+            'timestamp': log['timestamp']
+        })
+    for key in logs_by_user_and_date:
+        logs_by_user_and_date[key].reverse() # Ascending order for calculations
+
     formatted_logs = []
     user_balances = {}
     first_log_processed = {}
@@ -233,7 +253,11 @@ def admin_dashboard():
         uid = log['user_id']
         date_str = str(log['log_date'])
         
-        calc = calculate_intern_hours(uid, date_str)
+        # Pull pre-grouped data to execute hours calculations completely in-memory
+        daily_logs = logs_by_user_and_date.get((uid, date_str), [])
+        ot_approved = ot_map.get((uid, date_str), 0.0)
+        
+        calc = calculate_intern_hours(uid, date_str, daily_logs=daily_logs, ot_approved=ot_approved)
         
         if uid not in user_balances:
             user_balances[uid] = 0.0
