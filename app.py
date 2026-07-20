@@ -206,7 +206,7 @@ def admin_dashboard():
 
             # 3. Build comprehensive structured timeline history matching query filters
             query = '''
-                SELECT l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
+                SELECT l.id, l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
                 FROM logs l
                 JOIN users u ON l.user_id = u.id
             '''
@@ -239,11 +239,14 @@ def admin_dashboard():
             user_balances[uid] += calc['credited']
 
         formatted_logs.append({
+            'id': log['id'],
             'user_id': uid,
             'username': log['username'],
             'type': log['log_type'],
             'timestamp': log['timestamp'].strftime('%Y-%m-%d %I:%M %p'),
             'date_str': date_str,
+            'raw_date': log['timestamp'].strftime('%Y-%m-%d'),
+            'raw_time': log['timestamp'].strftime('%H:%M'),
             'raw': calc['raw'],
             'credited': calc['credited'],
             'potential_ot': calc['potential_ot'],
@@ -326,6 +329,29 @@ def manual_insert_log():
             with conn.cursor() as cursor:
                 cursor.execute('INSERT INTO logs (user_id, log_type, timestamp) VALUES (%s, %s, %s)',
                                (int(user_id), log_type, full_timestamp))
+            conn.commit()
+            
+    return redirect(url_for('admin_dashboard', filter_user=user_id))
+
+@app.route('/admin/logs/edit', methods=['POST'])
+def edit_log():
+    if session.get('role') != 'admin': return "Unauthorized", 403
+    
+    log_id = request.form.get('log_id')
+    log_type = request.form.get('log_type')
+    log_date = request.form.get('manual_date')
+    log_time = request.form.get('manual_time')
+    user_id = request.form.get('user_id')
+    
+    if log_id and log_type and log_date and log_time:
+        full_timestamp = f"{log_date} {log_time}:00"
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('''
+                    UPDATE logs 
+                    SET log_type = %s, timestamp = %s 
+                    WHERE id = %s
+                ''', (log_type, full_timestamp, int(log_id)))
             conn.commit()
             
     return redirect(url_for('admin_dashboard', filter_user=user_id))

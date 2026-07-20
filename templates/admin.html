@@ -183,6 +183,7 @@
                                 <th class="p-3">Credited Time</th>
                                 <th class="p-3">Total Balance</th>
                                 <th class="p-3 text-center">Absence & Overtime Action</th>
+                                <th class="p-3 text-center">Manage</th>
                             </tr>
                         </thead>
                         <tbody class="text-sm">
@@ -258,10 +259,15 @@
 
                                     {% endif %}
                                 </td>
+                                <td class="p-3 text-center">
+                                    <button onclick="openEditModal('{{ log.id }}', '{{ log.user_id }}', '{{ log.type }}', '{{ log.raw_date }}', '{{ log.raw_time }}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded font-bold shadow-sm transition-colors">
+                                        Edit
+                                    </button>
+                                </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="7" class="p-4 text-center text-gray-400">No shift logs tracked yet.</td>
+                                <td colspan="8" class="p-4 text-center text-gray-400">No shift logs tracked yet.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -272,5 +278,65 @@
         </div>
 
     </div>
+
+    <!-- Edit Log Modal -->
+    <div id="editLogModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center">
+        <div class="relative mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 font-bold">Edit Attendance Log</h3>
+                <form action="/admin/logs/edit" method="POST" class="mt-4 text-left space-y-4">
+                    <input type="hidden" name="log_id" id="edit_log_id">
+                    <input type="hidden" name="user_id" id="edit_user_id">
+                    
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Action Type</label>
+                        <select name="log_type" id="edit_log_type" required class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <option value="IN">IN (Clock In)</option>
+                            <option value="OUT">OUT (Clock Out)</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Calendar Date</label>
+                        <input type="date" name="manual_date" id="edit_log_date" required class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Timestamp Time</label>
+                        <input type="time" name="manual_time" id="edit_log_time" required class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    
+                    <div class="flex space-x-3 pt-2">
+                        <button type="button" onclick="closeEditModal()" class="w-1/2 bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-bold py-2 rounded-lg transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-sm">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openEditModal(logId, userId, logType, rawDate, rawTime) {
+            document.getElementById('edit_log_id').value = logId;
+            document.getElementById('edit_user_id').value = userId;
+            document.getElementById('edit_log_type').value = logType;
+            document.getElementById('edit_log_date').value = rawDate;
+            document.getElementById('edit_log_time').value = rawTime;
+            
+            const modal = document.getElementById('editLogModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('editLogModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    </script>
 </body>
 </html>
