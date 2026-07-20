@@ -211,14 +211,9 @@ def admin_dashboard():
                 SELECT l.id, l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
                 FROM logs l
                 JOIN users u ON l.user_id = u.id
+                ORDER BY l.timestamp DESC
             '''
-            params = []
-            if selected_user_id:
-                query += ' WHERE l.user_id = %s'
-                params.append(int(selected_user_id))
-            query += ' ORDER BY l.timestamp DESC'
-            
-            cursor.execute(query, params)
+            cursor.execute(query)
             raw_logs = cursor.fetchall()
 
             cursor.execute('SELECT user_id, absence_date FROM excused_absences')
