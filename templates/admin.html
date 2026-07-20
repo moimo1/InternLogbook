@@ -99,6 +99,29 @@
                     </div>
                 </div>
 
+                <!-- Create Intern Account Form -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3 flex items-center">
+                        <svg class="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                        </svg>
+                        Create Intern Account
+                    </h3>
+                    <form action="/admin/intern/create" method="POST" class="space-y-3">
+                        <div>
+                            <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Username</label>
+                            <input type="text" name="username" required placeholder="intern_name" class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Password</label>
+                            <input type="password" name="password" required placeholder="••••••••" class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-sm mt-2">
+                            Create Account
+                        </button>
+                    </form>
+                </div>
+
                 <!-- Insert Missed Log Utility Form Override Panel -->
                 <div class="bg-white p-6 rounded-xl shadow-sm border">
                     <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3 flex items-center">

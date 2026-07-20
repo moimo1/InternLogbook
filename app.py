@@ -80,26 +80,7 @@ def log_in():
         flash('Invalid username or password.', 'danger')
     return render_template('login.html')
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        'INSERT INTO users (username, password, roles, is_active) VALUES (%s, %s, %s, %s)',
-                        (username, password, 'intern', 1)
-                    )
-                conn.commit()
-            flash('Registration successful! Please log in.', 'success')
-            return redirect(url_for('log_in'))
-        except Exception:
-            flash('Username already exists.', 'danger')
-            
-    return render_template('register.html')
+
 
 @app.route('/logout')
 def logout():
@@ -348,6 +329,28 @@ def delete_intern(user_id):
         with conn.cursor() as cursor:
             cursor.execute('DELETE FROM users WHERE id = %s', (user_id,))
         conn.commit()
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/intern/create', methods=['POST'])
+def create_intern():
+    if session.get('role') != 'admin': return "Unauthorized", 403
+    
+    username = request.form.get('username')
+    password = request.form.get('password')
+    
+    if username and password:
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO users (username, password, roles, is_active) VALUES (%s, %s, 'intern', 1)",
+                        (username, password)
+                    )
+                conn.commit()
+            flash(f"Intern account '{username}' created successfully.", "success")
+        except Exception:
+            flash("Failed to create account. Username might already exist.", "danger")
+            
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/logs/manual-insert', methods=['POST'])
