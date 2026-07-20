@@ -268,8 +268,8 @@ def admin_dashboard():
 
         is_late = False
         if is_first_log and log['log_type'] == 'IN':
-            sched = get_schedule_for_date(log['timestamp'])
-            office_start = datetime.strptime(f"{date_str} {sched['start']}:00", '%Y-%m-%d %H:%M:%S')
+            log_sched = get_schedule_for_date(log['timestamp'])
+            office_start = datetime.strptime(f"{date_str} {log_sched['start']}:00", '%Y-%m-%d %H:%M:%S')
             if log['timestamp'] > office_start:
                 is_late = True
 
