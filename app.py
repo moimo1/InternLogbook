@@ -202,7 +202,28 @@ def admin_dashboard():
             # 2. Fetch Global Schedule System Settings
             cursor.execute("SELECT value FROM system_settings WHERE key = 'schedule_rules'")
             sched_row = cursor.fetchone()
-            sched = json.loads(sched_row['value']) if sched_row else {"MWF": {"start": "08:00", "end": "17:00"}, "TF": {"start": "08:00", "end": "17:00"}}
+            
+            default_sched = {
+                "MWF": {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"},
+                "TF":  {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"}
+            }
+            if sched_row:
+                try:
+                    sched = json.loads(sched_row['value'])
+                    if not isinstance(sched, dict):
+                        sched = default_sched
+                    else:
+                        for key in ["MWF", "TF"]:
+                            if key not in sched or not isinstance(sched[key], dict):
+                                sched[key] = default_sched[key]
+                            else:
+                                for subkey in ["start", "end", "break_start", "break_end"]:
+                                    if subkey not in sched[key]:
+                                        sched[key][subkey] = default_sched[key][subkey]
+                except Exception:
+                    sched = default_sched
+            else:
+                sched = default_sched
 
             # 3. Build comprehensive structured timeline history matching query filters
             query = '''
