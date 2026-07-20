@@ -225,6 +225,7 @@ def admin_dashboard():
 
     formatted_logs = []
     user_balances = {}
+    first_log_processed = {}
 
     for log in reversed(raw_logs):
         uid = log['user_id']
@@ -237,6 +238,19 @@ def admin_dashboard():
         
         if not any(fl['user_id'] == uid and fl['date_str'] == date_str for fl in formatted_logs):
             user_balances[uid] += calc['credited']
+
+        # Determine if this is the first log of the day for this user
+        is_first_log = False
+        if (uid, date_str) not in first_log_processed:
+            first_log_processed[(uid, date_str)] = True
+            is_first_log = True
+
+        is_late = False
+        if is_first_log and log['log_type'] == 'IN':
+            sched = get_schedule_for_date(log['timestamp'])
+            office_start = datetime.strptime(f"{date_str} {sched['start']}:00", '%Y-%m-%d %H:%M:%S')
+            if log['timestamp'] > office_start:
+                is_late = True
 
         formatted_logs.append({
             'id': log['id'],
@@ -252,7 +266,8 @@ def admin_dashboard():
             'potential_ot': calc['potential_ot'],
             'is_ot_approved': calc['is_ot_approved'],
             'is_excused': excused_map.get((uid, date_str), False),
-            'total_overall': round(user_balances[uid], 2)
+            'total_overall': round(user_balances[uid], 2),
+            'is_late': is_late
         })
 
     formatted_logs.reverse()

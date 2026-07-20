@@ -193,7 +193,7 @@
                                 {% if log.raw == 0 and log.type == 'OUT' and not log.is_excused %}bg-yellow-50
                                 {% elif log.is_excused %}bg-blue-50/60
                                 {% elif log.is_ot_approved %}bg-emerald-50/60
-                                {% elif log.type == 'IN' and (log.credited < log.raw or log.credited == 0) %}bg-red-50/50{% endif %}">
+                                {% elif log.is_late %}bg-red-50/50{% endif %}">
 
                                 <td class="p-3 font-semibold">{{ log.username }}</td>
                                 <td class="p-3">
@@ -250,7 +250,7 @@
                                             {% endif %}
                                         {% else %}
                                             <!-- Standard Lateness Labels Display -->
-                                            {% if log.type == 'IN' and (log.credited < log.raw or log.credited == 0) %}
+                                            {% if log.is_late %}
                                                 <span class="text-xs text-red-600 font-bold bg-red-100 px-2 py-0.5 rounded">LATE</span>
                                             {% else %}
                                                 <span class="text-xs text-gray-400 font-medium">Attended</span>
