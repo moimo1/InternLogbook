@@ -29,6 +29,16 @@
                             <input type="time" name="mwf_end" value="{{ sched.MWF.end }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                     </div>
+                    <div class="flex space-x-4 mt-2">
+                        <div class="w-1/2">
+                            <label class="text-xs text-gray-500">Lunch Break Start</label>
+                            <input type="time" name="mwf_break_start" value="{{ sched.MWF.break_start or '12:00' }}" class="w-full border p-2 rounded-md mt-1">
+                        </div>
+                        <div class="w-1/2">
+                            <label class="text-xs text-gray-500">Lunch Break End</label>
+                            <input type="time" name="mwf_break_end" value="{{ sched.MWF.break_end or '13:00' }}" class="w-full border p-2 rounded-md mt-1">
+                        </div>
+                    </div>
                 </div>
                 <div class="space-y-2">
                     <span class="text-sm font-bold text-purple-600">TF Shifts (Tue, Thu)</span>
@@ -40,6 +50,16 @@
                         <div class="w-1/2">
                             <label class="text-xs text-gray-500">Latest Office Close Time</label>
                             <input type="time" name="tf_end" value="{{ sched.TF.end }}" class="w-full border p-2 rounded-md mt-1">
+                        </div>
+                    </div>
+                    <div class="flex space-x-4 mt-2">
+                        <div class="w-1/2">
+                            <label class="text-xs text-gray-500">Lunch Break Start</label>
+                            <input type="time" name="tf_break_start" value="{{ sched.TF.break_start or '12:00' }}" class="w-full border p-2 rounded-md mt-1">
+                        </div>
+                        <div class="w-1/2">
+                            <label class="text-xs text-gray-500">Lunch Break End</label>
+                            <input type="time" name="tf_break_end" value="{{ sched.TF.break_end or '13:00' }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                     </div>
                 </div>

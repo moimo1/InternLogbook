@@ -18,10 +18,17 @@ def get_schedule_for_date(dt_obj):
             cursor.execute("SELECT value FROM system_settings WHERE key = 'schedule_rules'")
             row = cursor.fetchone()
 
+    default_rules = {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"}
     if row:
         rules = json.loads(row['value'])
-        return rules.get(sched_key, {"start": "08:00", "end": "17:00"})
-    return {"start": "08:00", "end": "17:00"}
+        sched = rules.get(sched_key, default_rules)
+        # Ensure we have break start and end key fallbacks
+        if "break_start" not in sched:
+            sched["break_start"] = "12:00"
+        if "break_end" not in sched:
+            sched["break_end"] = "13:00"
+        return sched
+    return default_rules
 
 
 def calculate_intern_hours(user_id, log_date_str):
@@ -82,7 +89,19 @@ def calculate_intern_hours(user_id, log_date_str):
                     cred_out = min(out_time, office_end)
 
                     if cred_out > cred_in:
-                        credited_hours += (cred_out - cred_in).total_seconds() / 3600.0
+                        # Calculate lunch break overlap if break config exists
+                        break_start_str = sched.get("break_start", "12:00")
+                        break_end_str = sched.get("break_end", "13:00")
+                        break_start = datetime.strptime(f"{log_date_str} {break_start_str}:00", '%Y-%m-%d %H:%M:%S')
+                        break_end = datetime.strptime(f"{log_date_str} {break_end_str}:00", '%Y-%m-%d %H:%M:%S')
+                        
+                        overlap_start = max(cred_in, break_start)
+                        overlap_end = min(cred_out, break_end)
+                        overlap_hours = 0.0
+                        if overlap_end > overlap_start:
+                            overlap_hours = (overlap_end - overlap_start).total_seconds() / 3600.0
+                            
+                        credited_hours += ((cred_out - cred_in).total_seconds() / 3600.0) - overlap_hours
 
                     # --- OVERTIME CALCULATION ---
                     # Check if they clocked out PAST the official office close window

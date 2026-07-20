@@ -8,8 +8,10 @@ from core.engine import calculate_intern_hours, get_schedule_for_date
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'default_fallback_key')
 
-# Trigger schema building automatically when the serverless instance creates the app container
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"Skipping database schema initialization: {e}")
 
 # -------------------------------------------------------------------------
 # GLOBAL SESSION SECURITY INTERCEPTOR
@@ -46,6 +48,11 @@ def check_user_activity_status():
 # -------------------------------------------------------------------------
 @app.route('/', methods=['GET', 'POST'])
 def log_in():
+    if 'user_id' in session:
+        if session.get('role') == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('scan'))
+
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -61,6 +68,7 @@ def log_in():
                 flash('Your internship period has ended.', 'danger')
                 return redirect(url_for('log_in'))
                 
+            session.permanent = True
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['roles']
@@ -211,28 +219,22 @@ def admin_dashboard():
             cursor.execute(query, params)
             raw_logs = cursor.fetchall()
 
-            # 4. Fetch dynamic excused absence registry to map matrix references
             cursor.execute('SELECT user_id, absence_date FROM excused_absences')
             excused_list = cursor.fetchall()
             excused_map = {(e['user_id'], str(e['absence_date'])): True for e in excused_list}
 
-    # Format data blocks cleanly to supply contextual variables for the table loop
     formatted_logs = []
-    
-    # Track overall running hourly totals globally per user across individual dates
     user_balances = {}
 
     for log in reversed(raw_logs):
         uid = log['user_id']
         date_str = str(log['log_date'])
         
-        # Pull processed values out of the engine payload metrics dict
         calc = calculate_intern_hours(uid, date_str)
         
         if uid not in user_balances:
             user_balances[uid] = 0.0
         
-        # Only add to balance loop dynamically once per unique day sequence anchor block
         if not any(fl['user_id'] == uid and fl['date_str'] == date_str for fl in formatted_logs):
             user_balances[uid] += calc['credited']
 
@@ -250,7 +252,6 @@ def admin_dashboard():
             'total_overall': round(user_balances[uid], 2)
         })
 
-    # Reverse back to display newest entry timestamps on top rows of the dashboard table UI
     formatted_logs.reverse()
 
     return render_template('admin.html',
@@ -264,8 +265,18 @@ def update_settings():
     if session.get('role') != 'admin': return "Unauthorized", 403
     
     updated_sched = {
-        "MWF": {"start": request.form.get('mwf_start'), "end": request.form.get('mwf_end')},
-        "TF":  {"start": request.form.get('tf_start'),  "end": request.form.get('tf_end')}
+        "MWF": {
+            "start": request.form.get('mwf_start'), 
+            "end": request.form.get('mwf_end'),
+            "break_start": request.form.get('mwf_break_start'),
+            "break_end": request.form.get('mwf_break_end')
+        },
+        "TF":  {
+            "start": request.form.get('tf_start'),  
+            "end": request.form.get('tf_end'),
+            "break_start": request.form.get('tf_break_start'),
+            "break_end": request.form.get('tf_break_end')
+        }
     }
     
     with get_db_connection() as conn:
