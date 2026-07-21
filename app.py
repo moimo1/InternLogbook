@@ -1,12 +1,34 @@
 import os
 import json
-from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from flask import Flask, render_template, request, redirect, url_for, session, flash, g
 from core.database import get_db_connection, init_db
 from core.engine import calculate_intern_hours, get_schedule_for_date
 
+def get_local_now():
+    """
+    Returns a naive datetime object representing the current date and time
+    in the configured timezone (falls back to Asia/Manila).
+    Using naive datetimes prevents comparison issues with database logs.
+    """
+    tz_name = os.environ.get('TZ', os.environ.get('APP_TZ', 'Asia/Manila'))
+    try:
+        return datetime.now(ZoneInfo(tz_name)).replace(tzinfo=None)
+    except Exception:
+        return datetime.now()
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'default_fallback_key')
+
+@app.teardown_appcontext
+def close_db_connection(exception):
+    db_conn = g.pop('db_conn', None)
+    if db_conn is not None:
+        try:
+            db_conn.close()
+        except Exception:
+            pass
 
 try:
     init_db()
@@ -54,9 +76,13 @@ def log_in():
         return redirect(url_for('scan'))
 
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
         
+        if not username or not password:
+            flash('Username and password are required.', 'danger')
+            return render_template('login.html')
+            
         with get_db_connection() as conn:
             from psycopg2.extras import RealDictCursor
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -90,78 +116,97 @@ def logout():
 # -------------------------------------------------------------------------
 # INTERN INTERACTION ROUTES
 # -------------------------------------------------------------------------
-@app.route('/scan')
+@app.route('/scan', methods=['GET', 'POST'])
 def scan():
     if 'user_id' not in session:
-        flash('Please log in.')
+        flash('Please log in.', 'danger')
         return redirect(url_for('log_in'))
 
     user_id = session['user_id']
     username = session['username']
-
-    is_late = False
-    now = datetime.now()
-    current_time_str = now.strftime('%Y-%m-%d %H:%M:%S')
+    now = get_local_now()
 
     with get_db_connection() as conn:
         from psycopg2.extras import RealDictCursor
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-
+            # 1. Fetch last log
             cursor.execute('SELECT log_type, timestamp from logs WHERE user_id = %s ORDER BY timestamp DESC LIMIT 1', (user_id,))
             last_log = cursor.fetchone()
 
-            # --- DYNAMIC REFRESH LOOP / RAPID SCAN RATE LIMITER (30 MINUTE WINDOW) ---
-            if last_log:
-                last_log_time = last_log['timestamp']
-                time_delta = (now - last_log_time).total_seconds()
-                
-                if time_delta < 1800:
-                    cursor.execute('SELECT DISTINCT timestamp::date as log_date FROM logs WHERE user_id = %s', (user_id,))
-                    distinct_dates = cursor.fetchall()
-                    
-                    total_credited = sum(calculate_intern_hours(user_id, str(d['log_date']))['credited'] for d in distinct_dates)
-                    
-                    if last_log['log_type'] == 'IN':
-                        sched = get_schedule_for_date(last_log_time)
-                        target_date_str = last_log_time.strftime('%Y-%m-%d')
-                        office_start = datetime.strptime(f"{target_date_str} {sched['start']}:00", '%Y-%m-%d %H:%M:%S')
-                        if last_log_time > office_start:
-                            is_late = True
-
-                    return render_template('confirmation.html',
-                                           username=username,
-                                           log_type=last_log['log_type'],
-                                           time=last_log_time.strftime('%Y-%m-%d %I:%M %p'),
-                                           is_late=is_late,
-                                           total_hours=round(total_credited, 2))
-
-            next_log = 'OUT' if (last_log and last_log['log_type'] == 'IN') else 'IN'
-
-            if next_log == 'IN':
-                sched = get_schedule_for_date(now)
-                target_date_str = now.strftime('%Y-%m-%d')
-                office_start = datetime.strptime(f"{target_date_str} {sched['start']}:00", '%Y-%m-%d %H:%M:%S')
-                if now > office_start:
-                    is_late = True
-
-            cursor.execute('INSERT INTO logs (user_id, log_type, timestamp) VALUES (%s, %s, %s)',
-                           (user_id, next_log, current_time_str))
-            conn.commit()
-
+            # 2. Compute total credited hours
             cursor.execute('SELECT DISTINCT timestamp::date as log_date FROM logs WHERE user_id = %s', (user_id,))
             distinct_dates = cursor.fetchall()
 
-    total_credited = 0.0
-    for d in distinct_dates:
-        res = calculate_intern_hours(user_id, str(d['log_date']))
-        total_credited += res['credited']
+    total_credited = sum(calculate_intern_hours(user_id, str(d['log_date']))['credited'] for d in distinct_dates)
+    total_hours_formatted = round(total_credited, 2)
 
-    return render_template('confirmation.html',
+    # 3. Operating hours window evaluation
+    sched = get_schedule_for_date(now)
+    target_date_str = now.strftime('%Y-%m-%d')
+    office_start = datetime.strptime(f"{target_date_str} {sched['start']}:00", '%Y-%m-%d %H:%M:%S')
+    office_end = datetime.strptime(f"{target_date_str} {sched['end']}:00", '%Y-%m-%d %H:%M:%S')
+    
+    earliest_allowed = office_start - timedelta(hours=2)
+    latest_allowed = office_end + timedelta(hours=3)
+    
+    outside_hours = (now < earliest_allowed or now > latest_allowed)
+    allowed_window_str = f"{earliest_allowed.strftime('%I:%M %p')} - {latest_allowed.strftime('%I:%M %p')}"
+
+    # 4. Rapid scan cooldown evaluation (30 minutes)
+    cooldown_active = False
+    cooldown_remaining = 0
+    if last_log:
+        time_delta = (now - last_log['timestamp']).total_seconds()
+        if time_delta < 1800:
+            cooldown_active = True
+            cooldown_remaining = int((1800 - time_delta) // 60) + 1
+
+    next_log = 'OUT' if (last_log and last_log['log_type'] == 'IN') else 'IN'
+
+    # --- POST REQUEST: EXPLICIT BUTTON CLICK ACTION ---
+    if request.method == 'POST':
+        if outside_hours:
+            flash("Action rejected: Logging is disabled outside operating hours.", "danger")
+            return redirect(url_for('scan'))
+
+        if cooldown_active:
+            flash(f"Action rejected: Cooldown active. Please wait {cooldown_remaining} minute(s).", "warning")
+            return redirect(url_for('scan'))
+
+        is_late = False
+        if next_log == 'IN':
+            if now > office_start:
+                is_late = True
+
+        current_time_str = now.strftime('%Y-%m-%d %H:%M:%S')
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('INSERT INTO logs (user_id, log_type, timestamp) VALUES (%s, %s, %s)',
+                               (user_id, next_log, current_time_str))
+            conn.commit()
+
+        return render_template('confirmation.html',
+                               username=username,
+                               log_type=next_log,
+                               time=now.strftime('%Y-%m-%d %I:%M %p'),
+                               is_late=is_late,
+                               outside_hours=False,
+                               total_hours=total_hours_formatted)
+
+    # --- GET REQUEST: READ-ONLY DISPLAY PORTAL ---
+    last_log_time_fmt = last_log['timestamp'].strftime('%Y-%m-%d %I:%M %p') if last_log else ''
+
+    return render_template('scan.html',
                            username=username,
-                           log_type=next_log,
-                           time=now.strftime('%Y-%m-%d %I:%M %p'),
-                           is_late=is_late,
-                           total_hours=round(total_credited, 2))
+                           last_log=last_log,
+                           last_log_time_fmt=last_log_time_fmt,
+                           next_log=next_log,
+                           outside_hours=outside_hours,
+                           allowed_window=allowed_window_str,
+                           cooldown_active=cooldown_active,
+                           cooldown_remaining=cooldown_remaining,
+                           total_hours=total_hours_formatted)
 
 # -------------------------------------------------------------------------
 # ADMINISTRATIVE DASHBOARD ROUTES
@@ -234,6 +279,7 @@ def admin_dashboard():
         if key not in logs_by_user_and_date:
             logs_by_user_and_date[key] = []
         logs_by_user_and_date[key].append({
+            'id': log['id'],
             'log_type': log['log_type'],
             'timestamp': log['timestamp']
         })
@@ -242,23 +288,44 @@ def admin_dashboard():
 
     formatted_logs = []
     user_balances = {}
+    day_accumulated_credited = {}
+    day_accumulated_raw = {}
     first_log_processed = {}
 
     for log in reversed(raw_logs):
         uid = log['user_id']
         date_str = str(log['log_date'])
         
-        # Pull pre-grouped data to execute hours calculations completely in-memory
         daily_logs = logs_by_user_and_date.get((uid, date_str), [])
-        ot_approved = ot_map.get((uid, date_str), 0.0)
         
-        calc = calculate_intern_hours(uid, date_str, daily_logs=daily_logs, ot_approved=ot_approved)
+        # Find current log index to compute progressive hours up to this point
+        current_idx = 0
+        for i, dl in enumerate(daily_logs):
+            if dl['id'] == log['id']:
+                current_idx = i
+                break
+                
+        progressive_logs = daily_logs[:current_idx + 1]
+        is_last_log_of_day = (current_idx == len(daily_logs) - 1)
+        ot_approved = ot_map.get((uid, date_str), 0.0) if is_last_log_of_day else 0.0
+        
+        calc = calculate_intern_hours(uid, date_str, daily_logs=progressive_logs, ot_approved=ot_approved)
+        
+        full_day_ot = ot_map.get((uid, date_str), 0.0)
+        calc_full = calculate_intern_hours(uid, date_str, daily_logs=daily_logs, ot_approved=full_day_ot)
+        
+        prev_cred = day_accumulated_credited.get((uid, date_str), 0.0)
+        new_cred = calc['credited'] - prev_cred
+        day_accumulated_credited[(uid, date_str)] = calc['credited']
+        
+        prev_raw = day_accumulated_raw.get((uid, date_str), 0.0)
+        new_raw = calc['raw'] - prev_raw
+        day_accumulated_raw[(uid, date_str)] = calc['raw']
         
         if uid not in user_balances:
             user_balances[uid] = 0.0
-        
-        if not any(fl['user_id'] == uid and fl['date_str'] == date_str for fl in formatted_logs):
-            user_balances[uid] += calc['credited']
+            
+        user_balances[uid] += new_cred
 
         # Determine if this is the first log of the day for this user
         is_first_log = False
@@ -282,8 +349,9 @@ def admin_dashboard():
             'date_str': date_str,
             'raw_date': log['timestamp'].strftime('%Y-%m-%d'),
             'raw_time': log['timestamp'].strftime('%H:%M'),
-            'raw': calc['raw'],
-            'credited': calc['credited'],
+            'raw': round(new_raw, 2),
+            'credited': round(new_cred, 2),
+            'day_total_raw': round(calc_full['raw'], 2),
             'potential_ot': calc['potential_ot'],
             'is_ot_approved': calc['is_ot_approved'],
             'is_excused': excused_map.get((uid, date_str), False),
@@ -292,6 +360,13 @@ def admin_dashboard():
         })
 
     formatted_logs.reverse()
+
+    if request.args.get('partial') == '1':
+        return render_template('partials/admin_content.html',
+                               interns=interns,
+                               logs=formatted_logs,
+                               sched=sched,
+                               selected_user_id=selected_user_id)
 
     return render_template('admin.html',
                            interns=interns,
@@ -354,10 +429,12 @@ def delete_intern(user_id):
 def create_intern():
     if session.get('role') != 'admin': return "Unauthorized", 403
     
-    username = request.form.get('username')
-    password = request.form.get('password')
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
     
-    if username and password:
+    if not username or not password:
+        flash("Username and password cannot be empty or blank spaces.", "danger")
+    else:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
@@ -483,3 +560,190 @@ def revoke_overtime():
                 ''', (int(user_id), absence_date))
             conn.commit()
     return redirect(url_for('admin_dashboard', filter_user=user_id))
+
+@app.route('/admin/export')
+def export_excel():
+    if session.get('role') != 'admin':
+        return "Unauthorized", 403
+
+    selected_user_id = request.args.get('filter_user', '')
+
+    import csv
+    from io import StringIO
+    from flask import make_response
+
+    with get_db_connection() as conn:
+        from psycopg2.extras import RealDictCursor
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            if selected_user_id:
+                query = '''
+                    SELECT l.id, l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
+                    FROM logs l
+                    JOIN users u ON l.user_id = u.id
+                    WHERE l.user_id = %s
+                    ORDER BY l.timestamp DESC
+                '''
+                cursor.execute(query, (selected_user_id,))
+            else:
+                query = '''
+                    SELECT l.id, l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
+                    FROM logs l
+                    JOIN users u ON l.user_id = u.id
+                    ORDER BY l.timestamp DESC
+                '''
+                cursor.execute(query)
+                
+            raw_logs = cursor.fetchall()
+
+            cursor.execute('SELECT user_id, absence_date FROM excused_absences')
+            excused_list = cursor.fetchall()
+            excused_map = {(e['user_id'], str(e['absence_date'])): True for e in excused_list}
+
+            cursor.execute('SELECT user_id, overtime_date, hours_approved FROM approved_overtime')
+            ot_list = cursor.fetchall()
+            ot_map = {(o['user_id'], str(o['overtime_date'])): float(o['hours_approved']) for o in ot_list}
+
+    logs_by_user_and_date = {}
+    for log in raw_logs:
+        uid = log['user_id']
+        date_str = str(log['log_date'])
+        key = (uid, date_str)
+        if key not in logs_by_user_and_date:
+            logs_by_user_and_date[key] = []
+        logs_by_user_and_date[key].append({
+            'id': log['id'],
+            'log_type': log['log_type'],
+            'timestamp': log['timestamp']
+        })
+    for key in logs_by_user_and_date:
+        logs_by_user_and_date[key].reverse()
+
+    formatted_logs = []
+    user_balances = {}
+    day_accumulated_credited = {}
+    day_accumulated_raw = {}
+    first_log_processed = {}
+
+    for log in reversed(raw_logs):
+        uid = log['user_id']
+        date_str = str(log['log_date'])
+        
+        daily_logs = logs_by_user_and_date.get((uid, date_str), [])
+        
+        current_idx = 0
+        for i, dl in enumerate(daily_logs):
+            if dl['id'] == log['id']:
+                current_idx = i
+                break
+                
+        progressive_logs = daily_logs[:current_idx + 1]
+        is_last_log_of_day = (current_idx == len(daily_logs) - 1)
+        ot_approved = ot_map.get((uid, date_str), 0.0) if is_last_log_of_day else 0.0
+        
+        calc = calculate_intern_hours(uid, date_str, daily_logs=progressive_logs, ot_approved=ot_approved)
+        
+        full_day_ot = ot_map.get((uid, date_str), 0.0)
+        calc_full = calculate_intern_hours(uid, date_str, daily_logs=daily_logs, ot_approved=full_day_ot)
+        
+        prev_cred = day_accumulated_credited.get((uid, date_str), 0.0)
+        new_cred = calc['credited'] - prev_cred
+        day_accumulated_credited[(uid, date_str)] = calc['credited']
+        
+        prev_raw = day_accumulated_raw.get((uid, date_str), 0.0)
+        new_raw = calc['raw'] - prev_raw
+        day_accumulated_raw[(uid, date_str)] = calc['raw']
+        
+        if uid not in user_balances:
+            user_balances[uid] = 0.0
+            
+        user_balances[uid] += new_cred
+
+        is_first_log = False
+        if (uid, date_str) not in first_log_processed:
+            first_log_processed[(uid, date_str)] = True
+            is_first_log = True
+
+        is_late = False
+        if is_first_log and log['log_type'] == 'IN':
+            log_sched = get_schedule_for_date(log['timestamp'])
+            office_start = datetime.strptime(f"{date_str} {log_sched['start']}:00", '%Y-%m-%d %H:%M:%S')
+            if log['timestamp'] > office_start:
+                is_late = True
+
+        formatted_logs.append({
+            'username': log['username'],
+            'type': log['log_type'],
+            'timestamp': log['timestamp'].strftime('%Y-%m-%d %I:%M %p'),
+            'raw': round(new_raw, 2),
+            'credited': round(new_cred, 2),
+            'day_total_raw': round(calc_full['raw'], 2),
+            'total_overall': round(user_balances[uid], 2),
+            'is_late': is_late,
+            'is_excused': excused_map.get((uid, date_str), False),
+            'is_ot_approved': calc['is_ot_approved']
+        })
+
+    import openpyxl
+    from openpyxl.styles import PatternFill
+    from io import BytesIO
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Attendance Logs"
+    ws.append(['Intern', 'Action', 'Timestamp', 'Raw Time', 'Credited Time', 'Total Balance', 'Status'])
+    
+    late_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+    absence_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+    excused_fill = PatternFill(start_color="B8CCE4", end_color="B8CCE4", fill_type="solid")
+    
+    for row in reversed(formatted_logs):
+        status = []
+        if row['is_late']: status.append('Late')
+        
+        is_absence = (row['day_total_raw'] == 0 and row['type'] == 'OUT')
+        if is_absence:
+            if row['is_excused']:
+                status.append('Excused Absence')
+            else:
+                status.append('Absence')
+                
+        if row['is_ot_approved']: status.append('OT Approved')
+        status_str = ', '.join(status) if status else 'Attended'
+        
+        ws.append([
+            row['username'],
+            row['type'],
+            row['timestamp'],
+            row['raw'],
+            row['credited'],
+            row['total_overall'],
+            status_str
+        ])
+        
+        row_idx = ws.max_row
+        fill_to_apply = None
+        if is_absence:
+            if row['is_excused']:
+                fill_to_apply = excused_fill
+            else:
+                fill_to_apply = absence_fill
+        elif row['is_late']:
+            fill_to_apply = late_fill
+            
+        if fill_to_apply:
+            for col_idx in range(1, 8):
+                ws.cell(row=row_idx, column=col_idx).fill = fill_to_apply
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+        
+    resp = make_response(output.getvalue())
+    resp.headers["Content-Disposition"] = "attachment; filename=attendance_logs.xlsx"
+    resp.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return resp
+
+if __name__ == '__main__':
+    # Bind to 0.0.0.0 to ensure accessibility over the local network and tunnels
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)

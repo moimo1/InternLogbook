@@ -1,0 +1,227 @@
+<!-- Intern Roster List & Administrative Insertion Tools -->
+<div class="md:col-span-1 space-y-6">
+    <!-- Intern Roster -->
+    <div id="internRoster" class="bg-white p-6 rounded-xl shadow-sm border h-fit">
+        <h2 class="text-lg font-bold text-gray-800 mb-4">Intern Roster</h2>
+        <div class="space-y-4 max-h-[400px] overflow-y-auto">
+            {% for intern in interns %}
+            <div class="p-3 bg-gray-50 rounded-lg flex flex-col border space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-gray-700 text-sm">{{ intern['username'] }}</span>
+                    <span class="text-xs px-2 py-0.5 rounded font-semibold {% if intern['is_active'] == 1 %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                        {% if intern['is_active'] == 1 %}Active{% else %}Internship Over{% endif %}
+                    </span>
+                </div>
+                <div class="flex space-x-2">
+                    <form action="/admin/intern/toggle/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form">
+                        <input type="hidden" name="is_active" value="{% if intern['is_active'] == 1 %}0{% else %}1{% endif %}">
+                        <button type="submit" class="w-full text-center text-xs bg-gray-200 hover:bg-gray-300 py-1 rounded font-medium">
+                            {% if intern['is_active'] == 1 %}End Internship{% else %}Reactivate{% endif %}
+                        </button>
+                    </form>
+                    <form action="/admin/intern/delete/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form" onsubmit="return confirm('Delete intern history?');">
+                        <button type="submit" class="w-full text-center text-xs bg-red-100 text-red-700 py-1 rounded font-bold hover:bg-red-200">Remove</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Create Intern Account Form -->
+    <div id="createInternFormContainer" class="bg-white p-6 rounded-xl shadow-sm border">
+        <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3 flex items-center">
+            <svg class="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+            </svg>
+            Create Intern Account
+        </h3>
+        <form action="/admin/intern/create" method="POST" class="space-y-3 ajax-form">
+            <div>
+                <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Username</label>
+                <input type="text" name="username" required placeholder="intern_name" class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Password</label>
+                <input type="password" name="password" required placeholder="••••••••" class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-sm mt-2">
+                Create Account
+            </button>
+        </form>
+    </div>
+
+    <!-- Insert Missed Log Utility Form Override Panel -->
+    <div id="missedLogFormContainer" class="bg-white p-6 rounded-xl shadow-sm border">
+        <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3 flex items-center">
+            <svg class="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            Fix Missing Clock In/Out
+        </h3>
+        <form action="/admin/logs/manual-insert" method="POST" class="space-y-3 ajax-form">
+            <div>
+                <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Select Target Intern</label>
+                <select name="user_id" required class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    {% for intern in interns %}
+                        <option value="{{ intern.id }}">{{ intern.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Action Type</label>
+                    <select name="log_type" class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="IN">IN (Clock In)</option>
+                        <option value="OUT">OUT (Clock Out)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Timestamp Time</label>
+                    <input type="time" name="manual_time" required class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+            </div>
+            <div>
+                <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Calendar Date</label>
+                <input type="date" name="manual_date" required class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
+            <button type="submit" class="w-full bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-sm mt-2">
+                Insert Missing Stamp
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Log Summary Table Dashboard Container -->
+<div id="logTableContainer" class="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border">
+    <!-- HEADER WITH FILTER & EXPORT ACTION HUB -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 mb-4 gap-4">
+        <h2 class="text-lg font-bold text-gray-800">Attendance Logs & Computed Hours</h2>
+
+        <div class="flex items-center space-x-3 w-full sm:w-auto justify-end">
+            <!-- Dropdown Name Filter -->
+            <div class="flex items-center space-x-2">
+                <label for="filter_user" class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter:</label>
+                <select id="filter_user" onchange="filterLogs(this.value)" class="border p-1.5 text-xs rounded-md bg-gray-50 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="">All Interns</option>
+                    {% for intern in interns %}
+                        <option value="{{ intern['id'] }}" {% if selected_user_id == intern['id']|string %}selected{% endif %}>
+                            {{ intern['username'] }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Excel Download Trigger -->
+            <a id="exportExcelBtn" href="/admin/export?filter_user={{ selected_user_id }}" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 px-4 rounded-md shadow-sm transition-colors flex items-center">
+                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Export Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- Data Rendering Table -->
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-gray-800 text-white text-xs uppercase">
+                    <th class="p-3">Intern</th>
+                    <th class="p-3">Action</th>
+                    <th class="p-3">Timestamp</th>
+                    <th class="p-3">Raw Time</th>
+                    <th class="p-3">Credited Time</th>
+                    <th class="p-3">Total Balance</th>
+                    <th class="p-3 text-center">Absence & Overtime Action</th>
+                    <th class="p-3 text-center">Manage</th>
+                </tr>
+            </thead>
+            <tbody class="text-sm">
+                {% for log in logs %}
+                <tr class="log-row border-b hover:bg-gray-50
+                    {% if log.day_total_raw == 0 and log.type == 'OUT' and not log.is_excused %}bg-yellow-50
+                    {% elif log.is_excused %}bg-blue-50/60
+                    {% elif log.is_ot_approved %}bg-emerald-50/60
+                    {% elif log.is_late %}bg-red-50/50{% endif %}"
+                    data-user-id="{{ log.user_id }}">
+
+                    <td class="p-3 font-semibold">{{ log.username }}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-0.5 rounded text-xs font-black {% if log.type == 'IN' %}bg-green-100 text-green-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                            {{ log.type }}
+                        </span>
+                    </td>
+                    <td class="p-3 text-gray-600 font-mono text-xs">{{ log.timestamp }}</td>
+                    <td class="p-3 text-gray-700 font-bold">{{ log.raw }} hrs</td>
+                    <td class="p-3 text-blue-700 font-extrabold">{{ log.credited }} hrs</td>
+                    <td class="p-3 text-purple-700 font-black bg-purple-50/50">{{ log.total_overall }} hrs</td>
+
+                    <!-- Absence & Dynamic Overtime Action Controls Column -->
+                    <td class="p-3 text-center">
+                        {% if log.day_total_raw == 0 and log.type == 'OUT' %}
+                            {% if log.is_excused %}
+                                <form action="/admin/absence/unexcuse" method="POST" class="inline ajax-form">
+                                    <input type="hidden" name="user_id" value="{{ log.user_id }}">
+                                    <input type="hidden" name="absence_date" value="{{ log.date_str }}">
+                                    <button type="submit" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded font-bold shadow-sm transition-colors">
+                                        Revoke Excuse
+                                    </button>
+                                </form>
+                            {% else %}
+                                <form action="/admin/absence/excuse" method="POST" class="inline ajax-form">
+                                    <input type="hidden" name="user_id" value="{{ log.user_id }}">
+                                    <input type="hidden" name="absence_date" value="{{ log.date_str }}">
+                                    <button type="submit" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded font-bold shadow-sm transition-colors">
+                                        Excuse Absence
+                                    </button>
+                                </form>
+                            {% endif %}
+                        {% else %}
+
+                            <!-- DYNAMIC OVERTIME BLOCK HOOK -->
+                            {% if log.type == 'OUT' and log.potential_ot >= 0.5 %}
+                                {% if log.is_ot_approved %}
+                                    <form action="/admin/overtime/revoke" method="POST" class="inline ajax-form">
+                                        <input type="hidden" name="user_id" value="{{ log.user_id }}">
+                                        <input type="hidden" name="absence_date" value="{{ log.date_str }}">
+                                        <button type="submit" class="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded font-bold shadow-sm transition-colors">
+                                            Revoke OT (+{{ log.potential_ot }}h)
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <form action="/admin/overtime/approve" method="POST" class="inline ajax-form">
+                                        <input type="hidden" name="user_id" value="{{ log.user_id }}">
+                                        <input type="hidden" name="absence_date" value="{{ log.date_str }}">
+                                        <input type="hidden" name="ot_hours" value="{{ log.potential_ot }}">
+                                        <button type="submit" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded font-bold shadow-sm transition-colors animate-pulse">
+                                            Approve OT (+{{ log.potential_ot }}h)
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            {% else %}
+                                <!-- Standard Lateness Labels Display -->
+                                {% if log.is_late %}
+                                    <span class="text-xs text-red-600 font-bold bg-red-100 px-2 py-0.5 rounded">LATE</span>
+                                {% else %}
+                                    <span class="text-xs text-gray-400 font-medium">Attended</span>
+                                {% endif %}
+                            {% endif %}
+
+                        {% endif %}
+                    </td>
+                    <td class="p-3 text-center">
+                        <button onclick="openEditModal('{{ log.id }}', '{{ log.user_id }}', '{{ log.type }}', '{{ log.raw_date }}', '{{ log.raw_time }}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded font-bold shadow-sm transition-colors">
+                            Edit
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="p-4 text-center text-gray-400">No shift logs tracked yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

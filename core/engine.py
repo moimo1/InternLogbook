@@ -77,10 +77,15 @@ def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=N
     i = 0
     while i < len(logs):
         if logs[i]['log_type'] == 'IN':
-            if i + 1 < len(logs) and logs[i + 1]['log_type'] == 'OUT':
+            # Find the first OUT log after this IN log
+            j = i + 1
+            while j < len(logs) and logs[j]['log_type'] != 'OUT':
+                j += 1
+            
+            if j < len(logs):
                 in_time = logs[i]['timestamp']
-                out_time = logs[i + 1]['timestamp']
-
+                out_time = logs[j]['timestamp']
+                
                 # FORGOT TO CLOCK OUT SAFEGUARD: Ensure both stamps are on the same calendar day
                 if in_time.date() == out_time.date():
                     shift_duration = (out_time - in_time).total_seconds() / 3600.0
@@ -111,15 +116,12 @@ def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=N
                         credited_hours += ((cred_out - cred_in).total_seconds() / 3600.0) - overlap_hours
 
                     # --- OVERTIME CALCULATION ---
-                    # Check if they clocked out PAST the official office close window
                     if out_time > office_end:
                         ot_duration = (out_time - office_end).total_seconds() / 3600.0
-
-                        # Enforce the minimum 30-minute threshold constraint
                         if ot_duration >= 0.5:
                             potential_ot += ot_duration
 
-                i += 2
+                i = j + 1
             else:
                 # Orphaned IN at end of list
                 i += 1
