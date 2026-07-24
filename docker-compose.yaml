@@ -18,6 +18,8 @@ services:
   web_app:
     build: .
     container_name: attendance_web
+    ports:
+      - "127.0.0.1:5000:5000" # Expose only to localhost for your native Caddy to reverse proxy
     env_file:
       - .env
     environment:
@@ -29,24 +31,5 @@ services:
     volumes:
       - .:/app # Mounts local files for real-time development reloading
 
-  # Caddy Reverse Proxy for Automated HTTPS
-  caddy:
-    image: caddy:2-alpine
-    container_name: attendance_caddy
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      - DOMAIN=${DOMAIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - web_app
-
 volumes:
   postgres_data:
-  caddy_data:
-  caddy_config:
