@@ -1,0 +1,6 @@
+@echo off
+echo Waiting for Docker and backend services to initialize...
+timeout /t 30 /nobreak
+
+echo Opening QR Code Screen in Kiosk Mode...
+start chrome --kiosk "https://ograasp-intern-logbook.loca.lt/display?key=office_kiosk_123"

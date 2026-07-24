@@ -1,5 +1,7 @@
 import os
 import json
+import time
+import hashlib
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask import Flask, render_template, request, redirect, url_for, session, flash, g
@@ -18,8 +20,24 @@ def get_local_now():
     except Exception:
         return datetime.now()
 
+def get_current_qr_tokens():
+    """
+    Generates time-based tokens for the current and previous minute.
+    This gives the user a 60-120 second window to scan and submit.
+    """
+    secret = app.secret_key or b'default_fallback_key'
+    if isinstance(secret, str):
+        secret = secret.encode('utf-8')
+    current_minute = int(time.time() // 60)
+    
+    token_current = hashlib.sha256(secret + f":{current_minute}".encode('utf-8')).hexdigest()[:10]
+    token_previous = hashlib.sha256(secret + f":{current_minute - 1}".encode('utf-8')).hexdigest()[:10]
+    
+    return [token_current, token_previous]
+
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'default_fallback_key')
+# Secure fallback for missing production keys to prevent spoofing
+app.secret_key = os.environ.get('SECRET_KEY') or os.urandom(24)
 
 @app.teardown_appcontext
 def close_db_connection(exception):
@@ -125,6 +143,11 @@ def scan():
     user_id = session['user_id']
     username = session['username']
     now = get_local_now()
+    
+    valid_tokens = get_current_qr_tokens()
+    provided_token = request.args.get('token') or request.form.get('token')
+    token_is_valid = (provided_token in valid_tokens)
+
 
     with get_db_connection() as conn:
         from psycopg2.extras import RealDictCursor
@@ -165,6 +188,10 @@ def scan():
 
     # --- POST REQUEST: EXPLICIT BUTTON CLICK ACTION ---
     if request.method == 'POST':
+        if not token_is_valid:
+            flash("Invalid or expired QR code. Please scan the office monitor again.", "danger")
+            return redirect(url_for('scan'))
+
         if outside_hours:
             flash("Action rejected: Logging is disabled outside operating hours.", "danger")
             return redirect(url_for('scan'))
@@ -172,6 +199,7 @@ def scan():
         if cooldown_active:
             flash(f"Action rejected: Cooldown active. Please wait {cooldown_remaining} minute(s).", "warning")
             return redirect(url_for('scan'))
+
 
         is_late = False
         if next_log == 'IN':
@@ -206,7 +234,25 @@ def scan():
                            allowed_window=allowed_window_str,
                            cooldown_active=cooldown_active,
                            cooldown_remaining=cooldown_remaining,
-                           total_hours=total_hours_formatted)
+                           total_hours=total_hours_formatted,
+                           token_is_valid=token_is_valid,
+                           qr_token=provided_token)
+
+@app.route('/display')
+def display_qr():
+    display_key = request.args.get('key')
+    if session.get('role') != 'admin' and display_key != 'office_kiosk_123':
+        return "Unauthorized", 403
+    return render_template('display.html')
+
+@app.route('/api/token')
+def api_token():
+    display_key = request.args.get('key')
+    if session.get('role') != 'admin' and display_key != 'office_kiosk_123':
+        return "Unauthorized", 403
+    # Return the current most up-to-date token for the display screen
+    return {"token": get_current_qr_tokens()[0]}
+
 
 # -------------------------------------------------------------------------
 # ADMINISTRATIVE DASHBOARD ROUTES
@@ -230,8 +276,8 @@ def admin_dashboard():
             sched_row = cursor.fetchone()
             
             default_sched = {
-                "MWF": {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"},
-                "TF":  {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"}
+                "MTW": {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"},
+                "ThF":  {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"}
             }
             if sched_row:
                 try:
@@ -239,7 +285,7 @@ def admin_dashboard():
                     if not isinstance(sched, dict):
                         sched = default_sched
                     else:
-                        for key in ["MWF", "TF"]:
+                        for key in ["MTW", "ThF"]:
                             if key not in sched or not isinstance(sched[key], dict):
                                 sched[key] = default_sched[key]
                             else:
@@ -270,6 +316,14 @@ def admin_dashboard():
             ot_list = cursor.fetchall()
             ot_map = {(o['user_id'], str(o['overtime_date'])): float(o['hours_approved']) for o in ot_list}
 
+            # Pre-fetch schedule rules to eliminate DB calls inside the calculation engine
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'schedule_rules'")
+            sched_row = cursor.fetchone()
+            if sched_row:
+                sys_sched = json.loads(sched_row['value'])
+            else:
+                sys_sched = {}
+
     # Group logs by user and date in memory to pass to calculate_intern_hours
     logs_by_user_and_date = {}
     for log in raw_logs:
@@ -286,41 +340,35 @@ def admin_dashboard():
     for key in logs_by_user_and_date:
         logs_by_user_and_date[key].reverse() # Ascending order for calculations
 
+    # Pre-calculate full days natively to avoid O(N^2) progressive loop overhead
+    day_calculations = {}
+    for key, d_logs in logs_by_user_and_date.items():
+        uid, date_str = key
+        full_day_ot = ot_map.get((uid, date_str), 0.0)
+        calc_full = calculate_intern_hours(uid, date_str, daily_logs=d_logs, ot_approved=full_day_ot, sys_sched=sys_sched)
+        day_calculations[key] = calc_full
+
     formatted_logs = []
     user_balances = {}
     day_accumulated_credited = {}
     day_accumulated_raw = {}
     first_log_processed = {}
 
+    # Iterate forwards chronologically (reversed raw_logs) to accurately track moving balances
     for log in reversed(raw_logs):
         uid = log['user_id']
         date_str = str(log['log_date'])
         
-        daily_logs = logs_by_user_and_date.get((uid, date_str), [])
-        
-        # Find current log index to compute progressive hours up to this point
-        current_idx = 0
-        for i, dl in enumerate(daily_logs):
-            if dl['id'] == log['id']:
-                current_idx = i
-                break
-                
-        progressive_logs = daily_logs[:current_idx + 1]
-        is_last_log_of_day = (current_idx == len(daily_logs) - 1)
-        ot_approved = ot_map.get((uid, date_str), 0.0) if is_last_log_of_day else 0.0
-        
-        calc = calculate_intern_hours(uid, date_str, daily_logs=progressive_logs, ot_approved=ot_approved)
-        
-        full_day_ot = ot_map.get((uid, date_str), 0.0)
-        calc_full = calculate_intern_hours(uid, date_str, daily_logs=daily_logs, ot_approved=full_day_ot)
+        calc_full = day_calculations[(uid, date_str)]
+        prog = calc_full['progressive'].get(log['id'], {'raw': 0, 'credited': 0, 'potential_ot': 0})
         
         prev_cred = day_accumulated_credited.get((uid, date_str), 0.0)
-        new_cred = calc['credited'] - prev_cred
-        day_accumulated_credited[(uid, date_str)] = calc['credited']
+        new_cred = prog['credited'] - prev_cred
+        day_accumulated_credited[(uid, date_str)] = prog['credited']
         
         prev_raw = day_accumulated_raw.get((uid, date_str), 0.0)
-        new_raw = calc['raw'] - prev_raw
-        day_accumulated_raw[(uid, date_str)] = calc['raw']
+        new_raw = prog['raw'] - prev_raw
+        day_accumulated_raw[(uid, date_str)] = prog['raw']
         
         if uid not in user_balances:
             user_balances[uid] = 0.0
@@ -335,7 +383,7 @@ def admin_dashboard():
 
         is_late = False
         if is_first_log and log['log_type'] == 'IN':
-            log_sched = get_schedule_for_date(log['timestamp'])
+            log_sched = get_schedule_for_date(log['timestamp'], sys_sched)
             office_start = datetime.strptime(f"{date_str} {log_sched['start']}:00", '%Y-%m-%d %H:%M:%S')
             if log['timestamp'] > office_start:
                 is_late = True
@@ -349,16 +397,18 @@ def admin_dashboard():
             'date_str': date_str,
             'raw_date': log['timestamp'].strftime('%Y-%m-%d'),
             'raw_time': log['timestamp'].strftime('%H:%M'),
-            'raw': round(new_raw, 2),
-            'credited': round(new_cred, 2),
+            'raw': round(calc_full['raw'], 2),
+            'credited': round(calc_full['credited'], 2),
             'day_total_raw': round(calc_full['raw'], 2),
-            'potential_ot': calc['potential_ot'],
-            'is_ot_approved': calc['is_ot_approved'],
+            'potential_ot': round(prog.get('potential_ot', 0.0), 2),
+            'is_ot_approved': calc_full['is_ot_approved'],
+            'approved_ot_hours': calc_full['approved_ot_hours'],
             'is_excused': excused_map.get((uid, date_str), False),
             'total_overall': round(user_balances[uid], 2),
             'is_late': is_late
         })
 
+    # Reverse back for newest-first display on the dashboard
     formatted_logs.reverse()
 
     if request.args.get('partial') == '1':
@@ -379,17 +429,17 @@ def update_settings():
     if session.get('role') != 'admin': return "Unauthorized", 403
     
     updated_sched = {
-        "MWF": {
-            "start": request.form.get('mwf_start'), 
-            "end": request.form.get('mwf_end'),
-            "break_start": request.form.get('mwf_break_start'),
-            "break_end": request.form.get('mwf_break_end')
+        "MTW": {
+            "start": request.form.get('mtw_start'), 
+            "end": request.form.get('mtw_end'),
+            "break_start": request.form.get('mtw_break_start'),
+            "break_end": request.form.get('mtw_break_end')
         },
-        "TF":  {
-            "start": request.form.get('tf_start'),  
-            "end": request.form.get('tf_end'),
-            "break_start": request.form.get('tf_break_start'),
-            "break_end": request.form.get('tf_break_end')
+        "ThF":  {
+            "start": request.form.get('thf_start'), 
+            "end": request.form.get('thf_end'),
+            "break_start": request.form.get('thf_break_start'),
+            "break_end": request.form.get('thf_break_end')
         }
     }
     
@@ -454,16 +504,24 @@ def manual_insert_log():
     if session.get('role') != 'admin': return "Unauthorized", 403
     
     user_id = request.form.get('user_id')
-    log_type = request.form.get('log_type')
-    log_date = request.form.get('manual_date')
-    log_time = request.form.get('manual_time')
+    log_types = request.form.getlist('log_type[]')
+    manual_dates = request.form.getlist('manual_date[]')
+    manual_times = request.form.getlist('manual_time[]')
     
-    if user_id and log_type and log_date and log_time:
-        full_timestamp = f"{log_date} {log_time}:00"
+    # Fallback to single scalar values if [] not used in frontend form (backwards compatibility)
+    if not log_types:
+        log_types = [request.form.get('log_type')]
+        manual_dates = [request.form.get('manual_date')]
+        manual_times = [request.form.get('manual_time')]
+    
+    if user_id:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute('INSERT INTO logs (user_id, log_type, timestamp) VALUES (%s, %s, %s)',
-                               (int(user_id), log_type, full_timestamp))
+                for log_type, log_date, log_time in zip(log_types, manual_dates, manual_times):
+                    if log_type and log_date and log_time:
+                        full_timestamp = f"{log_date} {log_time}:00"
+                        cursor.execute('INSERT INTO logs (user_id, log_type, timestamp) VALUES (%s, %s, %s)',
+                                       (int(user_id), log_type, full_timestamp))
             conn.commit()
             
     return redirect(url_for('admin_dashboard', filter_user=user_id))
@@ -487,6 +545,21 @@ def edit_log():
                     SET log_type = %s, timestamp = %s 
                     WHERE id = %s
                 ''', (log_type, full_timestamp, int(log_id)))
+            conn.commit()
+            
+    return redirect(url_for('admin_dashboard', filter_user=user_id))
+
+@app.route('/admin/logs/delete', methods=['POST'])
+def delete_log():
+    if session.get('role') != 'admin': return "Unauthorized", 403
+    
+    log_id = request.form.get('log_id')
+    user_id = request.form.get('user_id')
+    
+    if log_id:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('DELETE FROM logs WHERE id = %s', (int(log_id),))
             conn.commit()
             
     return redirect(url_for('admin_dashboard', filter_user=user_id))

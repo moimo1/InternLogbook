@@ -112,8 +112,8 @@ def init_db():
                 cursor.execute("SELECT value FROM system_settings WHERE key = 'schedule_rules'")
                 if not cursor.fetchone():
                     default_sched = {
-                        "MWF": {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"},
-                        "TF":  {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"}
+                        "MTW": {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"},
+                        "ThF":  {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"}
                     }
                     cursor.execute(
                         "INSERT INTO system_settings (key, value) VALUES ('schedule_rules', %s)",

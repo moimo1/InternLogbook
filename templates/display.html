@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office QR Display</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="bg-gray-900 flex flex-col items-center justify-center min-h-screen p-4 text-white">
+    <div class="text-center mb-8">
+        <h1 class="text-6xl font-black mb-4 text-blue-400">Intern Attendance</h1>
+        <p class="text-2xl text-gray-400 font-semibold">Scan this QR code with your phone to Clock-In/Out.</p>
+    </div>
+
+    <div class="bg-white p-8 rounded-3xl shadow-2xl border-8 border-gray-800">
+        <div id="qrcode" class="mx-auto flex justify-center"></div>
+    </div>
+    
+    <div class="mt-8 text-center text-gray-500 font-bold">
+        <p class="text-lg text-gray-400">Code updates automatically to enforce physical presence.</p>
+        <p id="countdown" class="text-sm mt-3 text-gray-600">Refreshing in 30s...</p>
+    </div>
+
+    <script>
+        let qrCodeObj = null;
+        let countdownValue = 30;
+
+        async function fetchTokenAndUpdateQR() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const key = urlParams.get('key');
+                const fetchUrl = key ? '/api/token?key=' + encodeURIComponent(key) : '/api/token';
+                
+                const response = await fetch(fetchUrl);
+                const data = await response.json();
+                
+                const scanUrl = window.location.origin + '/scan?token=' + data.token;
+                
+                if (qrCodeObj) {
+                    qrCodeObj.clear();
+                    qrCodeObj.makeCode(scanUrl);
+                } else {
+                    qrCodeObj = new QRCode(document.getElementById("qrcode"), {
+                        text: scanUrl,
+                        width: 400,
+                        height: 400,
+                        colorDark : "#0f172a",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+                }
+                
+                countdownValue = 30;
+                document.getElementById('countdown').innerText = "Refreshing in " + countdownValue + "s...";
+            } catch (e) {
+                console.error("Error fetching token:", e);
+                document.getElementById('countdown').innerText = "Connection lost. Retrying...";
+            }
+        }
+
+        setInterval(() => {
+            if (countdownValue > 0) {
+                countdownValue--;
+                document.getElementById('countdown').innerText = "Refreshing in " + countdownValue + "s...";
+            }
+            if (countdownValue === 0) {
+                fetchTokenAndUpdateQR();
+            }
+        }, 1000);
+
+        // Initial fetch
+        fetchTokenAndUpdateQR();
+    </script>
+</body>
+</html>

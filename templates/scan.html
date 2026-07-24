@@ -58,9 +58,18 @@
             <button disabled class="w-full bg-gray-300 text-gray-500 font-bold py-3.5 px-6 rounded-xl cursor-not-allowed text-lg mb-6">
                 Cooldown Active ({{ cooldown_remaining }}m)
             </button>
+        {% elif not token_is_valid %}
+            <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-6 text-purple-800 text-sm font-medium">
+                <p class="font-bold mb-1">📷 Scan Required</p>
+                <p class="text-xs text-purple-700">Please scan the live QR code on the office monitor to enable the Clock-In/Out buttons.</p>
+            </div>
+            <button disabled class="w-full bg-gray-300 text-gray-500 font-bold py-3.5 px-6 rounded-xl cursor-not-allowed text-lg mb-6">
+                Scan QR Code in Office
+            </button>
         {% else %}
             <form method="POST" action="{{ url_for('scan') }}" class="mb-6">
                 <input type="hidden" name="action_type" value="{{ next_log }}">
+                <input type="hidden" name="token" value="{{ qr_token }}">
                 {% if next_log == 'IN' %}
                     <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-extrabold py-4 px-6 rounded-xl shadow-lg transition duration-200 flex items-center justify-center gap-2 text-xl active:scale-95">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>

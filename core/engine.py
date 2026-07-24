@@ -1,37 +1,43 @@
 from datetime import datetime
 
 
-def get_schedule_for_date(dt_obj):
+def get_schedule_for_date(dt_obj, sys_sched=None):
     """
-    Determines whether a given date object falls under MWF or TF office 
+    Determines whether a given date object falls under MTW or ThF office 
     hour thresholds. Reads from system configuration rules.
     """
     import json
-    from core.database import get_db_connection
-    from psycopg2.extras import RealDictCursor
 
     weekday = dt_obj.weekday()  # Mon=0, Tue=1, Wed=2, Thu=3, Fri=4
-    sched_key = "MWF" if weekday in [0, 2, 4] else "TF"
-
-    with get_db_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute("SELECT value FROM system_settings WHERE key = 'schedule_rules'")
-            row = cursor.fetchone()
+    sched_key = "MTW" if weekday in [0, 1, 2] else "ThF"
 
     default_rules = {"start": "08:00", "end": "17:00", "break_start": "12:00", "break_end": "13:00"}
-    if row:
-        rules = json.loads(row['value'])
-        sched = rules.get(sched_key, default_rules)
-        # Ensure we have break start and end key fallbacks
-        if "break_start" not in sched:
-            sched["break_start"] = "12:00"
-        if "break_end" not in sched:
-            sched["break_end"] = "13:00"
-        return sched
-    return default_rules
+    
+    if sys_sched is not None:
+        rules = sys_sched
+    else:
+        from core.database import get_db_connection
+        from psycopg2.extras import RealDictCursor
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("SELECT value FROM system_settings WHERE key = 'schedule_rules'")
+                row = cursor.fetchone()
+        
+        if row:
+            rules = json.loads(row['value'])
+        else:
+            rules = {}
+
+    sched = rules.get(sched_key, default_rules)
+    # Ensure we have break start and end key fallbacks
+    if "break_start" not in sched:
+        sched["break_start"] = "12:00"
+    if "break_end" not in sched:
+        sched["break_end"] = "13:00"
+    return sched
 
 
-def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=None):
+def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=None, sys_sched=None):
     """
     Calculates raw, credited, and overtime hours for a specific intern.
     Cradles a minimum 30-minute requirement for overtime approval eligibility.
@@ -74,12 +80,24 @@ def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=N
     credited_hours = 0.0
     potential_ot = 0.0
 
+    progressive_results = {}
+
     i = 0
     while i < len(logs):
         if logs[i]['log_type'] == 'IN':
+            # Record balance before shift starts
+            progressive_results[logs[i]['id']] = {
+                'raw': raw_hours,
+                'credited': credited_hours,
+                'potential_ot': potential_ot
+            }
+            
             # Find the first OUT log after this IN log
             j = i + 1
             while j < len(logs) and logs[j]['log_type'] != 'OUT':
+                progressive_results[logs[j]['id']] = {
+                    'raw': raw_hours, 'credited': credited_hours, 'potential_ot': potential_ot
+                }
                 j += 1
             
             if j < len(logs):
@@ -92,7 +110,7 @@ def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=N
                     raw_hours += shift_duration
 
                     # Fetch schedule bounds
-                    sched = get_schedule_for_date(in_time)
+                    sched = get_schedule_for_date(in_time, sys_sched)
                     office_start = datetime.strptime(f"{log_date_str} {sched['start']}:00", '%Y-%m-%d %H:%M:%S')
                     office_end = datetime.strptime(f"{log_date_str} {sched['end']}:00", '%Y-%m-%d %H:%M:%S')
 
@@ -120,6 +138,10 @@ def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=N
                         ot_duration = (out_time - office_end).total_seconds() / 3600.0
                         if ot_duration >= 0.5:
                             potential_ot += ot_duration
+                            
+                progressive_results[logs[j]['id']] = {
+                    'raw': raw_hours, 'credited': credited_hours, 'potential_ot': potential_ot
+                }
 
                 i = j + 1
             else:
@@ -127,15 +149,24 @@ def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=N
                 i += 1
         else:
             # Stray OUT log
+            progressive_results[logs[i]['id']] = {
+                'raw': raw_hours, 'credited': credited_hours, 'potential_ot': potential_ot
+            }
             i += 1
 
     # If the admin approved the overtime, credit those hours to the baseline total
     if ot_approved > 0.0:
         credited_hours += ot_approved
+        if logs:
+            last_id = logs[-1]['id']
+            if last_id in progressive_results:
+                progressive_results[last_id]['credited'] += ot_approved
 
     return {
-        "raw": round(raw_hours, 2),
-        "credited": round(credited_hours, 2),
-        "potential_ot": round(potential_ot, 2),
-        "is_ot_approved": ot_approved > 0.0
+        'raw': round(raw_hours, 2),
+        'credited': round(credited_hours, 2),
+        'potential_ot': round(potential_ot, 2),
+        'is_ot_approved': (ot_approved > 0.0),
+        'approved_ot_hours': round(ot_approved, 2),
+        'progressive': progressive_results
     }

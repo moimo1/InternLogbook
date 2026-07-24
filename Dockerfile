@@ -11,4 +11,5 @@ RUN pip install --no-cache-dir openpyxl
 
 COPY . .
 
-CMD ["python", "app.py"]
+# Run the application with Gunicorn for production concurrency
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]

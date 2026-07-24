@@ -10,7 +10,13 @@
         <!-- Header -->
         <div class="bg-white p-6 rounded-xl shadow-sm flex justify-between items-center border">
             <h1 class="text-2xl font-bold text-gray-800">Attendance Dashboard</h1>
-            <a href="/logout" class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-600">Logout</a>
+            <div class="flex space-x-3">
+                <a href="/display" target="_blank" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                    Open QR Screen
+                </a>
+                <a href="/logout" class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-600 flex items-center">Logout</a>
+            </div>
         </div>
 
         <!-- Shift Schedule Windows Form Config -->
@@ -18,48 +24,48 @@
             <h2 class="text-lg font-bold text-gray-800 mb-4">Official Office Hours Configuration</h2>
             <form action="/admin/settings" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-6 ajax-form">
                 <div class="space-y-2 border-r pr-6">
-                    <span class="text-sm font-bold text-blue-600">MWF Shifts (Mon, Wed, Fri)</span>
+                    <span class="text-sm font-bold text-blue-600">MTW Shifts (Mon, Tue, Wed)</span>
                     <div class="flex space-x-4">
                         <div class="w-1/2">
                             <label class="text-xs text-gray-500">Earliest Office Start Time</label>
-                            <input type="time" name="mwf_start" value="{{ sched.MWF.start }}" class="w-full border p-2 rounded-md mt-1">
+                            <input type="time" name="mtw_start" value="{{ sched.MTW.start }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                         <div class="w-1/2">
                             <label class="text-xs text-gray-500">Latest Office Close Time</label>
-                            <input type="time" name="mwf_end" value="{{ sched.MWF.end }}" class="w-full border p-2 rounded-md mt-1">
+                            <input type="time" name="mtw_end" value="{{ sched.MTW.end }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                     </div>
                     <div class="flex space-x-4 mt-2">
                         <div class="w-1/2">
                             <label class="text-xs text-gray-500">Lunch Break Start</label>
-                            <input type="time" name="mwf_break_start" value="{{ sched.MWF.break_start or '12:00' }}" class="w-full border p-2 rounded-md mt-1">
+                            <input type="time" name="mtw_break_start" value="{{ sched.MTW.break_start or '12:00' }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                         <div class="w-1/2">
                             <label class="text-xs text-gray-500">Lunch Break End</label>
-                            <input type="time" name="mwf_break_end" value="{{ sched.MWF.break_end or '13:00' }}" class="w-full border p-2 rounded-md mt-1">
+                            <input type="time" name="mtw_break_end" value="{{ sched.MTW.break_end or '13:00' }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                     </div>
                 </div>
                 <div class="space-y-2">
-                    <span class="text-sm font-bold text-purple-600">TF Shifts (Tue, Thu)</span>
+                    <span class="text-sm font-bold text-purple-600">ThF Shifts (Thu, Fri)</span>
                     <div class="flex space-x-4">
                         <div class="w-1/2">
                             <label class="text-xs text-gray-500">Earliest Office Start Time</label>
-                            <input type="time" name="tf_start" value="{{ sched.TF.start }}" class="w-full border p-2 rounded-md mt-1">
+                            <input type="time" name="thf_start" value="{{ sched.ThF.start }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                         <div class="w-1/2">
                             <label class="text-xs text-gray-500">Latest Office Close Time</label>
-                            <input type="time" name="tf_end" value="{{ sched.TF.end }}" class="w-full border p-2 rounded-md mt-1">
+                            <input type="time" name="thf_end" value="{{ sched.ThF.end }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                     </div>
                     <div class="flex space-x-4 mt-2">
                         <div class="w-1/2">
                             <label class="text-xs text-gray-500">Lunch Break Start</label>
-                            <input type="time" name="tf_break_start" value="{{ sched.TF.break_start or '12:00' }}" class="w-full border p-2 rounded-md mt-1">
+                            <input type="time" name="thf_break_start" value="{{ sched.ThF.break_start or '12:00' }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                         <div class="w-1/2">
                             <label class="text-xs text-gray-500">Lunch Break End</label>
-                            <input type="time" name="tf_break_end" value="{{ sched.TF.break_end or '13:00' }}" class="w-full border p-2 rounded-md mt-1">
+                            <input type="time" name="thf_break_end" value="{{ sched.ThF.break_end or '13:00' }}" class="w-full border p-2 rounded-md mt-1">
                         </div>
                     </div>
                 </div>
