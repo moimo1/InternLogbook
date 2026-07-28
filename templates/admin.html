@@ -180,13 +180,14 @@
             if (showInactive === 0) {
                 document.getElementById('tabLogsActive').className = 'px-6 py-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600 bg-blue-50';
                 document.getElementById('tabLogsArchived').className = 'px-6 py-3 text-sm font-bold text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors';
+                document.querySelectorAll('.active-log-row').forEach(row => row.classList.remove('hidden'));
+                document.querySelectorAll('.archived-log-row').forEach(row => row.classList.add('hidden'));
             } else {
                 document.getElementById('tabLogsActive').className = 'px-6 py-3 text-sm font-bold text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors';
                 document.getElementById('tabLogsArchived').className = 'px-6 py-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600 bg-blue-50';
+                document.querySelectorAll('.active-log-row').forEach(row => row.classList.add('hidden'));
+                document.querySelectorAll('.archived-log-row').forEach(row => row.classList.remove('hidden'));
             }
-            
-            // Trigger AJAX fetch
-            refreshAdminComponents(false);
         }
 
         // Partial component fetcher function for seamless, non-reloading updates

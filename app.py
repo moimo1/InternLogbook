@@ -299,22 +299,12 @@ def admin_dashboard():
                 sched = default_sched
 
             # 3. Build comprehensive structured timeline history matching query filters
-            if show_inactive:
-                query = '''
-                    SELECT l.id, l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
-                    FROM logs l
-                    JOIN users u ON l.user_id = u.id
-                    WHERE u.is_active = 0
-                    ORDER BY l.timestamp DESC
-                '''
-            else:
-                query = '''
-                    SELECT l.id, l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
-                    FROM logs l
-                    JOIN users u ON l.user_id = u.id
-                    WHERE u.is_active = 1
-                    ORDER BY l.timestamp DESC
-                '''
+            query = '''
+                SELECT l.id, l.user_id, u.username, u.is_active, l.log_type, l.timestamp, l.timestamp::date as log_date 
+                FROM logs l
+                JOIN users u ON l.user_id = u.id
+                ORDER BY l.timestamp DESC
+            '''
             cursor.execute(query)
             raw_logs = cursor.fetchall()
 
@@ -403,6 +393,7 @@ def admin_dashboard():
             'id': log['id'],
             'user_id': uid,
             'username': log['username'],
+            'is_active': log['is_active'],
             'type': log['log_type'],
             'timestamp': log['timestamp'].strftime('%Y-%m-%d %I:%M %p'),
             'date_str': date_str,

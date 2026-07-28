@@ -231,6 +231,7 @@ function removeLogRow(btn) {
             <tbody class="text-sm">
                 {% for log in logs %}
                 <tr class="log-row border-b hover:bg-gray-50
+                    {% if log.is_active == 1 %}active-log-row {% if show_inactive %}hidden{% endif %}{% else %}archived-log-row {% if not show_inactive %}hidden{% endif %}{% endif %}
                     {% if log.day_total_raw == 0 and log.type == 'OUT' and not log.is_excused %}bg-yellow-50
                     {% elif log.is_excused %}bg-blue-50/60
                     {% elif log.is_ot_approved %}bg-emerald-50/60
