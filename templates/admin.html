@@ -157,13 +157,45 @@
             }
         }
 
+        window.showInactiveLogs = {{ '1' if show_inactive else '0' }};
+
+        function switchRosterTab(tab) {
+            if (tab === 'active') {
+                document.getElementById('rosterActive').classList.remove('hidden');
+                document.getElementById('rosterArchived').classList.add('hidden');
+                document.getElementById('tabRosterActive').className = 'w-1/2 text-center px-4 py-2 text-sm font-bold border-b-2 border-blue-600 text-blue-600 bg-blue-50';
+                document.getElementById('tabRosterArchived').className = 'w-1/2 text-center px-4 py-2 text-sm font-bold text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors';
+            } else {
+                document.getElementById('rosterActive').classList.add('hidden');
+                document.getElementById('rosterArchived').classList.remove('hidden');
+                document.getElementById('tabRosterActive').className = 'w-1/2 text-center px-4 py-2 text-sm font-bold text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors';
+                document.getElementById('tabRosterArchived').className = 'w-1/2 text-center px-4 py-2 text-sm font-bold border-b-2 border-blue-600 text-blue-600 bg-blue-50';
+            }
+        }
+
+        function switchLogsTab(showInactive) {
+            window.showInactiveLogs = showInactive;
+            
+            // Immediate visual feedback
+            if (showInactive === 0) {
+                document.getElementById('tabLogsActive').className = 'px-6 py-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600 bg-blue-50';
+                document.getElementById('tabLogsArchived').className = 'px-6 py-3 text-sm font-bold text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors';
+            } else {
+                document.getElementById('tabLogsActive').className = 'px-6 py-3 text-sm font-bold text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors';
+                document.getElementById('tabLogsArchived').className = 'px-6 py-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600 bg-blue-50';
+            }
+            
+            // Trigger AJAX fetch
+            refreshAdminComponents(false);
+        }
+
         // Partial component fetcher function for seamless, non-reloading updates
         async function refreshAdminComponents(forceUpdateForms = false) {
             try {
                 const filterUserSelect = document.getElementById('filter_user');
                 const selectedVal = filterUserSelect ? filterUserSelect.value : "";
                 
-                const response = await fetch(`/admin?partial=1&filter_user=${encodeURIComponent(selectedVal)}`);
+                const response = await fetch(`/admin?partial=1&filter_user=${encodeURIComponent(selectedVal)}&show_inactive=${window.showInactiveLogs}`);
                 if (response.ok) {
                     const html = await response.text();
                     

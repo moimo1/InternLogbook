@@ -263,6 +263,7 @@ def admin_dashboard():
         return "Unauthorized", 403
 
     selected_user_id = request.args.get('filter_user', '')
+    show_inactive = request.args.get('show_inactive', '0') == '1'
 
     with get_db_connection() as conn:
         from psycopg2.extras import RealDictCursor
@@ -298,12 +299,22 @@ def admin_dashboard():
                 sched = default_sched
 
             # 3. Build comprehensive structured timeline history matching query filters
-            query = '''
-                SELECT l.id, l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
-                FROM logs l
-                JOIN users u ON l.user_id = u.id
-                ORDER BY l.timestamp DESC
-            '''
+            if show_inactive:
+                query = '''
+                    SELECT l.id, l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
+                    FROM logs l
+                    JOIN users u ON l.user_id = u.id
+                    WHERE u.is_active = 0
+                    ORDER BY l.timestamp DESC
+                '''
+            else:
+                query = '''
+                    SELECT l.id, l.user_id, u.username, l.log_type, l.timestamp, l.timestamp::date as log_date 
+                    FROM logs l
+                    JOIN users u ON l.user_id = u.id
+                    WHERE u.is_active = 1
+                    ORDER BY l.timestamp DESC
+                '''
             cursor.execute(query)
             raw_logs = cursor.fetchall()
 
@@ -416,13 +427,15 @@ def admin_dashboard():
                                interns=interns,
                                logs=formatted_logs,
                                sched=sched,
-                               selected_user_id=selected_user_id)
+                               selected_user_id=selected_user_id,
+                               show_inactive=show_inactive)
 
     return render_template('admin.html',
                            interns=interns,
                            logs=formatted_logs,
                            sched=sched,
-                           selected_user_id=selected_user_id)
+                           selected_user_id=selected_user_id,
+                           show_inactive=show_inactive)
 
 @app.route('/admin/settings', methods=['POST'])
 def update_settings():

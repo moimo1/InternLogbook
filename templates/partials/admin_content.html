@@ -3,20 +3,28 @@
     <!-- Intern Roster -->
     <div id="internRoster" class="bg-white p-6 rounded-xl shadow-sm border h-fit">
         <h2 class="text-lg font-bold text-gray-800 mb-4">Intern Roster</h2>
+        <div class="flex border-b mb-4 cursor-pointer select-none">
+            <div id="tabRosterActive" onclick="switchRosterTab('active')" class="w-1/2 text-center px-4 py-2 text-sm font-bold border-b-2 border-blue-600 text-blue-600 bg-blue-50">Active</div>
+            <div id="tabRosterArchived" onclick="switchRosterTab('archived')" class="w-1/2 text-center px-4 py-2 text-sm font-bold text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors">Archived</div>
+        </div>
         <div class="space-y-4 max-h-[400px] overflow-y-auto">
-            {% for intern in interns %}
+            {% set active_interns = interns | selectattr("is_active", "equalto", 1) | list %}
+            {% set inactive_interns = interns | selectattr("is_active", "equalto", 0) | list %}
+            
+            <div id="rosterActive" class="space-y-4">
+            {% for intern in active_interns %}
             <div class="p-3 bg-gray-50 rounded-lg flex flex-col border space-y-2">
                 <div class="flex items-center justify-between">
                     <span class="font-bold text-gray-700 text-sm">{{ intern['username'] }}</span>
-                    <span class="text-xs px-2 py-0.5 rounded font-semibold {% if intern['is_active'] == 1 %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
-                        {% if intern['is_active'] == 1 %}Active{% else %}Internship Over{% endif %}
+                    <span class="text-xs px-2 py-0.5 rounded font-semibold bg-green-100 text-green-800">
+                        Active
                     </span>
                 </div>
                 <div class="flex space-x-2">
                     <form action="/admin/intern/toggle/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form">
-                        <input type="hidden" name="is_active" value="{% if intern['is_active'] == 1 %}0{% else %}1{% endif %}">
+                        <input type="hidden" name="is_active" value="0">
                         <button type="submit" class="w-full text-center text-xs bg-gray-200 hover:bg-gray-300 py-1 rounded font-medium">
-                            {% if intern['is_active'] == 1 %}End Internship{% else %}Reactivate{% endif %}
+                            End Internship
                         </button>
                     </form>
                     <form action="/admin/intern/delete/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form" onsubmit="return confirm('Delete intern history?');">
@@ -25,6 +33,35 @@
                 </div>
             </div>
             {% endfor %}
+            </div>
+            
+            <div id="rosterArchived" class="space-y-4 hidden">
+            {% if inactive_interns %}
+                {% for intern in inactive_interns %}
+                <div class="p-3 bg-gray-50 rounded-lg flex flex-col border space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-gray-500 text-sm line-through">{{ intern['username'] }}</span>
+                        <span class="text-xs px-2 py-0.5 rounded font-semibold bg-red-100 text-red-800">
+                            Internship Over
+                        </span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <form action="/admin/intern/toggle/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form">
+                            <input type="hidden" name="is_active" value="1">
+                            <button type="submit" class="w-full text-center text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 py-1 rounded font-medium transition-colors">
+                                Reactivate
+                            </button>
+                        </form>
+                        <form action="/admin/intern/delete/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form" onsubmit="return confirm('Delete intern history?');">
+                            <button type="submit" class="w-full text-center text-xs bg-red-100 text-red-700 py-1 rounded font-bold hover:bg-red-200">Remove</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-center text-gray-500 text-sm py-4">No archived interns.</p>
+            {% endif %}
+            </div>
         </div>
     </div>
 
@@ -136,8 +173,13 @@ function removeLogRow(btn) {
 <!-- Log Summary Table Dashboard Container -->
 <div id="logTableContainer" class="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border">
     <!-- HEADER WITH FILTER & EXPORT ACTION HUB -->
+    <div class="flex border-b mb-6 cursor-pointer select-none">
+        <div id="tabLogsActive" onclick="switchLogsTab(0)" class="px-6 py-3 text-sm font-bold {% if not show_inactive %}border-b-2 border-blue-600 text-blue-600 bg-blue-50{% else %}text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors{% endif %}">Active Logs</div>
+        <div id="tabLogsArchived" onclick="switchLogsTab(1)" class="px-6 py-3 text-sm font-bold {% if show_inactive %}border-b-2 border-blue-600 text-blue-600 bg-blue-50{% else %}text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors{% endif %}">Archived Logs</div>
+    </div>
+    
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 mb-4 gap-4">
-        <h2 class="text-lg font-bold text-gray-800">Attendance Logs & Computed Hours</h2>
+        <h2 class="text-lg font-bold text-gray-800">Computed Hours</h2>
 
         <div class="flex items-center space-x-3 w-full sm:w-auto justify-end">
             <!-- Dropdown Name Filter -->
@@ -145,11 +187,19 @@ function removeLogRow(btn) {
                 <label for="filter_user" class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter:</label>
                 <select id="filter_user" onchange="filterLogs(this.value)" class="border p-1.5 text-xs rounded-md bg-gray-50 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="">All Interns</option>
-                    {% for intern in interns %}
+                    {% for intern in active_interns %}
                         <option value="{{ intern['id'] }}" {% if selected_user_id == intern['id']|string %}selected{% endif %}>
                             {{ intern['username'] }}
                         </option>
                     {% endfor %}
+                    {% if inactive_interns %}
+                        <option disabled>--- Archived Interns ---</option>
+                        {% for intern in inactive_interns %}
+                            <option value="{{ intern['id'] }}" {% if selected_user_id == intern['id']|string %}selected{% endif %}>
+                                {{ intern['username'] }}
+                            </option>
+                        {% endfor %}
+                    {% endif %}
                 </select>
             </div>
 
@@ -164,7 +214,7 @@ function removeLogRow(btn) {
     </div>
 
     <!-- Data Rendering Table -->
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto min-h-[400px]">
         <table class="w-full text-left border-collapse">
             <thead>
                 <tr class="bg-gray-800 text-white text-xs uppercase">
