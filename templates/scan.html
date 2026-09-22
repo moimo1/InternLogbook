@@ -95,5 +95,30 @@
             <a href="{{ url_for('logout') }}" class="text-red-600 hover:underline font-bold">Logout</a>
         </div>
     </div>
+    <script>
+        document.addEventListener('submit', function(e) {
+            const form = e.target;
+            const submitBtn = e.submitter || form.querySelector('button[type="submit"]');
+            if (submitBtn && !submitBtn.disabled) {
+                // Determine if we should preserve the original size
+                const btnWidth = submitBtn.offsetWidth;
+                if (btnWidth) {
+                    submitBtn.style.width = btnWidth + 'px';
+                }
+                
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+                
+                // Keep the icon if it exists, otherwise just a spinner
+                submitBtn.innerHTML = `
+                    <svg class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                `;
+            }
+        });
+    </script>
 </body>
 </html>

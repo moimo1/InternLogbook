@@ -238,9 +238,27 @@
 
         // Global delegate for smooth AJAX form submissions without full-page reloads
         document.addEventListener('submit', async function(e) {
-            if (e.target.classList.contains('ajax-form') || e.target.id === 'editLogForm') {
+            const form = e.target;
+            const submitBtn = e.submitter || form.querySelector('button[type="submit"]') || form.querySelector('input[type="submit"]');
+            let originalContent = '';
+            
+            if (form.classList.contains('ajax-form') || form.id === 'editLogForm') {
                 e.preventDefault();
-                const form = e.target;
+                
+                if (submitBtn && !submitBtn.disabled) {
+                    const btnWidth = submitBtn.offsetWidth;
+                    if (btnWidth) submitBtn.style.width = btnWidth + 'px';
+                    originalContent = submitBtn.innerHTML;
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('opacity-75', 'cursor-not-allowed', 'flex', 'items-center', 'justify-center');
+                    submitBtn.innerHTML = `
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg> Processing...
+                    `;
+                }
+
                 const formData = new FormData(form);
                 
                 try {
@@ -257,6 +275,29 @@
                     await refreshAdminComponents(true);
                 } catch (err) {
                     console.error("AJAX form submission failed:", err);
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalContent;
+                        submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                        submitBtn.style.width = ''; // Reset width
+                    }
+                }
+            } else {
+                // For non-AJAX forms (like standard deletes that reload), just show the spinner and proceed
+                if (submitBtn && !submitBtn.disabled) {
+                    const btnWidth = submitBtn.offsetWidth;
+                    if (btnWidth) submitBtn.style.width = btnWidth + 'px';
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('opacity-75', 'cursor-not-allowed', 'flex', 'items-center', 'justify-center');
+                    submitBtn.innerHTML = `
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg> Processing...
+                    `;
+                    // Actually submit the form since we disabled the button that might stop submission
+                    form.submit();
                 }
             }
         });
