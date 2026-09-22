@@ -19,8 +19,15 @@
             </div>
         </div>
 
+        <!-- Tab Navigation -->
+        <div class="bg-white rounded-xl shadow-sm border flex overflow-hidden">
+            <button id="navTabLogs" onclick="switchMainTab('logs')" class="flex-1 py-3 text-sm font-bold text-blue-600 bg-blue-50 border-b-2 border-blue-600 transition-colors">Attendance Logs</button>
+            <button id="navTabInterns" onclick="switchMainTab('interns')" class="flex-1 py-3 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent transition-colors">Intern Management</button>
+            <button id="navTabSettings" onclick="switchMainTab('settings')" class="flex-1 py-3 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent transition-colors">Settings</button>
+        </div>
+
         <!-- Shift Schedule Windows Form Config -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border">
+        <div id="section-settings" class="tab-section hidden bg-white p-6 rounded-xl shadow-sm border">
             <h2 class="text-lg font-bold text-gray-800 mb-4">Official Office Hours Configuration</h2>
             <form action="/admin/settings" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-6 ajax-form">
                 <div class="space-y-2 border-r pr-6">
@@ -76,7 +83,7 @@
         </div>
 
         <!-- DYNAMIC CONTENT CONTAINER (ROSTER & LOGS) -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="adminDynamicContent">
+        <div id="adminDynamicContent">
             {% include 'partials/admin_content.html' %}
         </div>
 
@@ -123,6 +130,30 @@
     </div>
 
     <script>
+        function switchMainTab(tabId) {
+            // Hide all tab sections
+            document.querySelectorAll('.tab-section').forEach(el => el.classList.add('hidden'));
+            
+            // Show the selected tab section
+            const section = document.getElementById('section-' + tabId);
+            if (section) {
+                section.classList.remove('hidden');
+            }
+            
+            // Reset all nav buttons
+            const navIds = ['navTabLogs', 'navTabInterns', 'navTabSettings'];
+            navIds.forEach(id => {
+                const btn = document.getElementById(id);
+                btn.className = 'flex-1 py-3 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent transition-colors';
+            });
+            
+            // Highlight selected nav button
+            const activeBtn = document.getElementById('navTab' + tabId.charAt(0).toUpperCase() + tabId.slice(1));
+            if (activeBtn) {
+                activeBtn.className = 'flex-1 py-3 text-sm font-bold text-blue-600 bg-blue-50 border-b-2 border-blue-600 transition-colors';
+            }
+        }
+
         function openEditModal(logId, userId, logType, rawDate, rawTime) {
             document.getElementById('edit_log_id').value = logId;
             document.getElementById('edit_user_id').value = userId;

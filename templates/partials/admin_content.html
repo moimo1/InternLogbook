@@ -1,7 +1,10 @@
-<!-- Intern Roster List & Administrative Insertion Tools -->
-<div class="md:col-span-1 space-y-6">
-    <!-- Intern Roster -->
-    <div id="internRoster" class="bg-white p-6 rounded-xl shadow-sm border h-fit">
+<!-- Intern Management Tab Section -->
+<div id="section-interns" class="tab-section hidden w-full">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+        <!-- Left Column: Roster -->
+        <div>
+            <!-- Intern Roster -->
+            <div id="internRoster" class="bg-white p-6 rounded-xl shadow-sm border h-fit">
         <h2 class="text-lg font-bold text-gray-800 mb-4">Intern Roster</h2>
         <div class="flex border-b mb-4 cursor-pointer select-none">
             <div id="tabRosterActive" onclick="switchRosterTab('active')" class="w-1/2 text-center px-4 py-2 text-sm font-bold border-b-2 border-blue-600 text-blue-600 bg-blue-50">Active</div>
@@ -65,8 +68,12 @@
         </div>
     </div>
 
-    <!-- Create Intern Account Form -->
-    <div id="createInternFormContainer" class="bg-white p-6 rounded-xl shadow-sm border">
+        </div>
+        
+        <!-- Right Column: Administrative Insertion Tools -->
+        <div class="space-y-6">
+            <!-- Create Intern Account Form -->
+            <div id="createInternFormContainer" class="bg-white p-6 rounded-xl shadow-sm border">
         <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3 flex items-center">
             <svg class="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
@@ -167,11 +174,13 @@ function removeLogRow(btn) {
     }
 }
 </script>
+        </div>
     </div>
 </div>
 
 <!-- Log Summary Table Dashboard Container -->
-<div id="logTableContainer" class="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border">
+<div id="section-logs" class="tab-section w-full">
+    <div id="logTableContainer" class="bg-white p-6 rounded-xl shadow-sm border w-full">
     <!-- HEADER WITH FILTER & EXPORT ACTION HUB -->
     <div class="flex border-b mb-6 cursor-pointer select-none">
         <div id="tabLogsActive" onclick="switchLogsTab(0)" class="px-6 py-3 text-sm font-bold {% if not show_inactive %}border-b-2 border-blue-600 text-blue-600 bg-blue-50{% else %}text-gray-500 border-b hover:text-gray-700 hover:bg-gray-50 transition-colors{% endif %}">Active Logs</div>
@@ -322,5 +331,6 @@ function removeLogRow(btn) {
                 {% endfor %}
             </tbody>
         </table>
+    </div>
     </div>
 </div>
