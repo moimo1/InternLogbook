@@ -100,7 +100,7 @@
             <div>
                 <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Select Target Intern</label>
                 <select name="user_id" required class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    {% for intern in interns %}
+                    {% for intern in active_interns %}
                         <option value="{{ intern.id }}">{{ intern.username }}</option>
                     {% endfor %}
                 </select>
