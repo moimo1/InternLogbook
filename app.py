@@ -20,20 +20,6 @@ def get_local_now():
     except Exception:
         return datetime.now()
 
-def get_current_qr_tokens():
-    """
-    Generates time-based tokens for the current and previous minute.
-    This gives the user a 60-120 second window to scan and submit.
-    """
-    secret = app.secret_key or b'default_fallback_key'
-    if isinstance(secret, str):
-        secret = secret.encode('utf-8')
-    current_minute = int(time.time() // 60)
-    
-    token_current = hashlib.sha256(secret + f":{current_minute}".encode('utf-8')).hexdigest()[:10]
-    token_previous = hashlib.sha256(secret + f":{current_minute - 1}".encode('utf-8')).hexdigest()[:10]
-    
-    return [token_current, token_previous]
 
 app = Flask(__name__)
 # Secure fallback for missing production keys to prevent spoofing
@@ -144,9 +130,10 @@ def scan():
     username = session['username']
     now = get_local_now()
     
-    valid_tokens = get_current_qr_tokens()
-    provided_token = request.args.get('token') or request.form.get('token')
-    token_is_valid = (provided_token in valid_tokens)
+    # IP Whitelisting Validation
+    client_ip = request.remote_addr
+    allowed_prefixes = os.environ.get('ALLOWED_IP_PREFIXES', '192.168.,10.,172.,127.0.0.1').split(',')
+    ip_is_valid = any(client_ip.startswith(prefix) for prefix in allowed_prefixes)
 
 
     with get_db_connection() as conn:
@@ -188,8 +175,8 @@ def scan():
 
     # --- POST REQUEST: EXPLICIT BUTTON CLICK ACTION ---
     if request.method == 'POST':
-        if not token_is_valid:
-            flash("Invalid or expired QR code. Please scan the office monitor again.", "danger")
+        if not ip_is_valid:
+            flash("Invalid network. You must be connected to the office Wi-Fi to clock in/out.", "danger")
             return redirect(url_for('scan'))
 
         if outside_hours:
@@ -235,23 +222,16 @@ def scan():
                            cooldown_active=cooldown_active,
                            cooldown_remaining=cooldown_remaining,
                            total_hours=total_hours_formatted,
-                           token_is_valid=token_is_valid,
-                           qr_token=provided_token)
+                           ip_is_valid=ip_is_valid)
 
 @app.route('/display')
 def display_qr():
-    display_key = request.args.get('key')
-    if session.get('role') != 'admin' and display_key != 'office_kiosk_123':
+    client_ip = request.remote_addr
+    allowed_prefixes = os.environ.get('ALLOWED_IP_PREFIXES', '192.168.,10.,172.,127.0.0.1').split(',')
+    ip_is_valid = any(client_ip.startswith(prefix) for prefix in allowed_prefixes)
+    if session.get('role') != 'admin' and not ip_is_valid:
         return "Unauthorized", 403
     return render_template('display.html')
-
-@app.route('/api/token')
-def api_token():
-    display_key = request.args.get('key')
-    if session.get('role') != 'admin' and display_key != 'office_kiosk_123':
-        return "Unauthorized", 403
-    # Return the current most up-to-date token for the display screen
-    return {"token": get_current_qr_tokens()[0]}
 
 
 # -------------------------------------------------------------------------
