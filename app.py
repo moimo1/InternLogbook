@@ -508,7 +508,7 @@ def manual_insert_log():
                                        (int(user_id), log_type, full_timestamp))
             conn.commit()
             
-    return redirect(url_for('admin_dashboard', filter_user=user_id))
+    return redirect(request.referrer or url_for('admin_dashboard'))
 
 @app.route('/admin/logs/edit', methods=['POST'])
 def edit_log():
@@ -531,7 +531,7 @@ def edit_log():
                 ''', (log_type, full_timestamp, int(log_id)))
             conn.commit()
             
-    return redirect(url_for('admin_dashboard', filter_user=user_id))
+    return redirect(request.referrer or url_for('admin_dashboard'))
 
 @app.route('/admin/logs/delete', methods=['POST'])
 def delete_log():
@@ -546,7 +546,7 @@ def delete_log():
                 cursor.execute('DELETE FROM logs WHERE id = %s', (int(log_id),))
             conn.commit()
             
-    return redirect(url_for('admin_dashboard', filter_user=user_id))
+    return redirect(request.referrer or url_for('admin_dashboard'))
 
 # -------------------------------------------------------------------------
 # ADMINISTRATIVE OVERRIDE PATHWAYS (ABSENCE & OVERTIME)
@@ -565,7 +565,7 @@ def excuse_absence():
                     ON CONFLICT DO NOTHING
                 ''', (int(user_id), absence_date))
             conn.commit()
-    return redirect(url_for('admin_dashboard', filter_user=user_id))
+    return redirect(request.referrer or url_for('admin_dashboard'))
 
 @app.route('/admin/absence/unexcuse', methods=['POST'])
 def unexcuse_absence():
@@ -579,7 +579,7 @@ def unexcuse_absence():
                 cursor.execute('DELETE FROM excused_absences WHERE user_id = %s AND absence_date = %s',
                                (int(user_id), absence_date))
             conn.commit()
-    return redirect(url_for('admin_dashboard', filter_user=user_id))
+    return redirect(request.referrer or url_for('admin_dashboard'))
 
 @app.route('/admin/overtime/approve', methods=['POST'])
 def approve_overtime():
@@ -599,7 +599,7 @@ def approve_overtime():
                     SET hours_approved = EXCLUDED.hours_approved
                 ''', (int(user_id), absence_date, float(ot_hours)))
             conn.commit()
-    return redirect(url_for('admin_dashboard', filter_user=user_id))
+    return redirect(request.referrer or url_for('admin_dashboard'))
 
 @app.route('/admin/overtime/revoke', methods=['POST'])
 def revoke_overtime():
@@ -616,7 +616,7 @@ def revoke_overtime():
                     WHERE user_id = %s AND overtime_date = %s
                 ''', (int(user_id), absence_date))
             conn.commit()
-    return redirect(url_for('admin_dashboard', filter_user=user_id))
+    return redirect(request.referrer or url_for('admin_dashboard'))
 
 @app.route('/admin/export')
 def export_excel():
