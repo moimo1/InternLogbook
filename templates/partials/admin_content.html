@@ -24,14 +24,17 @@
                     </span>
                 </div>
                 <div class="flex space-x-2">
-                    <form action="/admin/intern/toggle/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form">
+                    <button type="button" onclick="openEditInternModal('{{ intern.id }}', '{{ intern.username }}')" class="flex-1 text-center text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 rounded font-bold transition-colors">
+                        Edit
+                    </button>
+                    <form action="/admin/intern/toggle/{{ intern['id'] }}" method="POST" class="flex-1 ajax-form">
                         <input type="hidden" name="is_active" value="0">
-                        <button type="submit" class="w-full text-center text-xs bg-gray-200 hover:bg-gray-300 py-1 rounded font-medium">
-                            End Internship
+                        <button type="submit" class="w-full text-center text-xs bg-gray-200 hover:bg-gray-300 py-1 rounded font-medium transition-colors">
+                            End
                         </button>
                     </form>
-                    <form action="/admin/intern/delete/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form" onsubmit="return confirm('Delete intern history?');">
-                        <button type="submit" class="w-full text-center text-xs bg-red-100 text-red-700 py-1 rounded font-bold hover:bg-red-200">Remove</button>
+                    <form action="/admin/intern/delete/{{ intern['id'] }}" method="POST" class="flex-1 ajax-form" onsubmit="return confirm('Delete intern history?');">
+                        <button type="submit" class="w-full text-center text-xs bg-red-100 text-red-700 py-1 rounded font-bold hover:bg-red-200 transition-colors">Remove</button>
                     </form>
                 </div>
             </div>
@@ -49,14 +52,17 @@
                         </span>
                     </div>
                     <div class="flex space-x-2">
-                        <form action="/admin/intern/toggle/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form">
+                        <button type="button" onclick="openEditInternModal('{{ intern.id }}', '{{ intern.username }}')" class="flex-1 text-center text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 rounded font-bold transition-colors">
+                            Edit
+                        </button>
+                        <form action="/admin/intern/toggle/{{ intern['id'] }}" method="POST" class="flex-1 ajax-form">
                             <input type="hidden" name="is_active" value="1">
                             <button type="submit" class="w-full text-center text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 py-1 rounded font-medium transition-colors">
                                 Reactivate
                             </button>
                         </form>
-                        <form action="/admin/intern/delete/{{ intern['id'] }}" method="POST" class="w-1/2 ajax-form" onsubmit="return confirm('Delete intern history?');">
-                            <button type="submit" class="w-full text-center text-xs bg-red-100 text-red-700 py-1 rounded font-bold hover:bg-red-200">Remove</button>
+                        <form action="/admin/intern/delete/{{ intern['id'] }}" method="POST" class="flex-1 ajax-form" onsubmit="return confirm('Delete intern history?');">
+                            <button type="submit" class="w-full text-center text-xs bg-red-100 text-red-700 py-1 rounded font-bold hover:bg-red-200 transition-colors">Remove</button>
                         </form>
                     </div>
                 </div>

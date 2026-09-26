@@ -483,6 +483,37 @@ def create_intern():
             
     return redirect(url_for('admin_dashboard'))
 
+@app.route('/admin/intern/edit/<int:user_id>', methods=['POST'])
+def edit_intern(user_id):
+    if session.get('role') != 'admin': return "Unauthorized", 403
+    
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
+    
+    if not username:
+        flash("Username cannot be empty.", "danger")
+        return redirect(request.referrer or url_for('admin_dashboard'))
+        
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                if password:
+                    cursor.execute(
+                        "UPDATE users SET username = %s, password = %s WHERE id = %s AND roles = 'intern'",
+                        (username, password, user_id)
+                    )
+                else:
+                    cursor.execute(
+                        "UPDATE users SET username = %s WHERE id = %s AND roles = 'intern'",
+                        (username, user_id)
+                    )
+            conn.commit()
+        flash(f"Intern account updated successfully.", "success")
+    except Exception:
+        flash("Failed to update account. Username might already exist.", "danger")
+        
+    return redirect(request.referrer or url_for('admin_dashboard'))
+
 @app.route('/admin/logs/manual-insert', methods=['POST'])
 def manual_insert_log():
     if session.get('role') != 'admin': return "Unauthorized", 403

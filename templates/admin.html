@@ -129,7 +129,49 @@
         </div>
     </div>
 
+    <!-- Edit Intern Modal -->
+    <div id="editInternModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center">
+        <div class="relative mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 text-gray-900 font-bold">Edit Intern Account</h3>
+                <form action="/admin/intern/edit/0" method="POST" id="editInternForm" class="mt-4 text-left space-y-4 ajax-form">
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">Username</label>
+                        <input type="text" name="username" id="edit_intern_username" required class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-500 uppercase tracking-wide block">New Password (leave blank to keep current)</label>
+                        <input type="password" name="password" id="edit_intern_password" placeholder="••••••••" class="w-full border p-2 text-xs rounded-md bg-gray-50 mt-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div class="flex space-x-3 pt-2">
+                        <button type="button" onclick="closeEditInternModal()" class="w-1/2 bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-bold py-2 rounded-lg transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-sm">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
+        function openEditInternModal(userId, username) {
+            document.getElementById('edit_intern_username').value = username;
+            document.getElementById('edit_intern_password').value = '';
+            document.getElementById('editInternForm').action = `/admin/intern/edit/${userId}`;
+            
+            const modal = document.getElementById('editInternModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeEditInternModal() {
+            const modal = document.getElementById('editInternModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
         function switchMainTab(tabId) {
             // Hide all tab sections
             document.querySelectorAll('.tab-section').forEach(el => el.classList.add('hidden'));
@@ -299,6 +341,8 @@
                     });
                     if (form.id === 'editLogForm') {
                         closeEditModal();
+                    } else if (form.id === 'editInternForm') {
+                        closeEditInternModal();
                     } else {
                         form.reset();
                     }
