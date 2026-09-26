@@ -53,7 +53,7 @@ def calculate_intern_hours(user_id, log_date_str, daily_logs=None, ot_approved=N
                 if daily_logs is None:
                     # Fetch shift logs matching this distinct date
                     cursor.execute('''
-                                   SELECT log_type, timestamp
+                                   SELECT id, log_type, timestamp
                                    FROM logs
                                    WHERE user_id = %s
                                      AND timestamp :: date = %s
